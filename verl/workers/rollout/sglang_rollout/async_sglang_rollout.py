@@ -97,7 +97,6 @@ class AsyncSGLangRollout(BaseRollout):
         self.config = config
 
         self._tool_schemas, self._tool_map, self._tool_call_parser_type, self._sgl_tools, self._function_call_parser = self._initialize_tools(config, tokenizer)
-        assert not (not config.enforce_eager and config.free_cache_engine), "disable CUDA graph (enforce_eager = False) if free cache engine"
         logger.info(f"tool_schemas: {self._tool_schemas}, tool_map: {self._tool_map}, tool_call_parser_type: {self._tool_call_parser_type}, sgl_tools: {self._sgl_tools}, function_call_parser: {self._function_call_parser}")
 
         self._init_distributed_env(device_mesh_cpu=device_mesh, **kwargs)
@@ -191,7 +190,7 @@ class AsyncSGLangRollout(BaseRollout):
                 model_path=actor_module,
                 dtype=self.config.dtype,
                 mem_fraction_static=self.config.gpu_memory_utilization,
-                enable_memory_saver=True,
+                enable_memory_saver=self.config.free_cache_engine,
                 base_gpu_id=0,
                 gpu_id_step=1,
                 tp_size=self._tp_size,
@@ -216,7 +215,7 @@ class AsyncSGLangRollout(BaseRollout):
 
         self.sharding_manager = None
         # offload
-        if self._tp_rank == 0:
+        if self._tp_rank == 0 and config.free_cache_engine:
             self._engine.release_memory_occupation()
         self.is_sleep = True
 
@@ -313,8 +312,6 @@ class AsyncSGLangRollout(BaseRollout):
     @GPUMemoryLogger(role="sglang async rollout", logger=logger)
     @torch.no_grad()
     def generate_sequences(self, prompts: DataProto, **kwargs) -> DataProto:
-        # if self.config.free_cache_engine:
-
         idx = prompts.batch["input_ids"]  # (bs, prompt_length)
         # left-padded attention_mask
         attention_mask = prompts.batch["attention_mask"]
@@ -452,7 +449,7 @@ class AsyncSGLangRollout(BaseRollout):
         )
 
         # free cache engine
-        if self.config.free_cache_engine and self._engine is not None:
+        if self._engine is not None:
             self._engine.flush_cache()
 
         return DataProto(batch=batch, non_tensor_batch=_non_tensor_batch)
@@ -719,7 +716,7 @@ class AsyncSGLangRollout(BaseRollout):
         )
 
         # free cache engine
-        if self.config.free_cache_engine and self._engine is not None and self._tp_rank == 0:
+        if self._engine is not None and self._tp_rank == 0:
             self._engine.flush_cache()
 
         return DataProto(batch=batch, non_tensor_batch={"messages": np.array(messages), "reward_scores": np.array(reward_scores)})
