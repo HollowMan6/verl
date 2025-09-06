@@ -20,6 +20,8 @@ def default_compute_score(
     data_source,
     solution_str,
     ground_truth,
+    step=0,
+    tokenizer=None,
     extra_info=None,
     sandbox_fusion_url=None,
     concurrent_semaphore=None,
@@ -101,7 +103,10 @@ def default_compute_score(
         from . import search_r1_like_qa_em
 
         res = search_r1_like_qa_em.compute_score(solution_str, ground_truth)
+    elif "rlla" in data_source:
+        from . import rlla
 
+        res = rlla.compute_score(solution_str, ground_truth, extra_info, tokenizer, step)
     else:
         raise NotImplementedError(f"Reward function is not implemented for {data_source=}")
 
@@ -110,7 +115,7 @@ def default_compute_score(
     elif isinstance(res, int | float | bool):
         return float(res)
     else:
-        return float(res[0])
+        return {"score": float(res[0]), "format_score": 0.0, "correctness_score": float(res[0]), "length_score": 0.0}
 
 
 @deprecated("verl.utils.reward_score.default_compute_score")
