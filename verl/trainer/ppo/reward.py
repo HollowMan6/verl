@@ -151,7 +151,9 @@ def load_reward_manager(
     )
 
 
-def compute_reward(data: DataProto, reward_fn: AbstractRewardManager) -> tuple[torch.Tensor, dict[str, Any]]:
+def compute_reward(
+    data: DataProto, global_steps, reward_fn: AbstractRewardManager
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict[str, Any]]:
     """
     Compute reward for a batch of data.
     Args:
@@ -161,19 +163,22 @@ def compute_reward(data: DataProto, reward_fn: AbstractRewardManager) -> tuple[t
         Tuple of reward tensor and extra info dictionary.
     """
     try:
-        reward_result = reward_fn(data, return_dict=True)
+        reward_result = reward_fn(data, global_steps, return_dict=True)
         reward_tensor = reward_result["reward_tensor"]
+        format_tensor = reward_result["format_tensor"]
+        correctness_tensor = reward_result["correctness_tensor"]
+        length_tensor = reward_result["length_tensor"]
         reward_extra_infos_dict = reward_result.get("reward_extra_info", {})
     except Exception as e:
         print(f"Error in reward_fn: {e}")
         reward_tensor = reward_fn(data)
         reward_extra_infos_dict = {}
 
-    return reward_tensor, reward_extra_infos_dict
+    return reward_tensor, format_tensor, correctness_tensor, length_tensor, reward_extra_infos_dict
 
 
 @ray.remote(num_cpus=1)
-def compute_reward_async(data: DataProto, config=None, tokenizer=None, reward_fn=None):
+def compute_reward_async(data: DataProto, global_steps, config=None, tokenizer=None, reward_fn=None):
     """
     Load the reward manager and compute the reward for a batch of data.
     This is meant to be run in a separate Ray worker.
@@ -188,4 +193,4 @@ def compute_reward_async(data: DataProto, config=None, tokenizer=None, reward_fn
             config, tokenizer, num_examine=0, **config.reward_model.get("reward_kwargs", {})
         )
 
-    return compute_reward(data, reward_fn)
+    return compute_reward(data, global_steps, reward_fn)
