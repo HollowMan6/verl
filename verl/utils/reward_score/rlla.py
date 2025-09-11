@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import json
+import math
 import os
 import re
 from collections import Counter
+from typing import Any
 
 import numpy as np
 
@@ -125,62 +127,63 @@ def compute_response_score(solution_str, ground_truth, tokenizer, reward_type, v
         # 对ground truth进行预处理
         gt = preprocess_text(gt)
 
-        try:
-            if reward_type == "embedding":
-                from infinity_client import Client
-                from infinity_client.api.default import embeddings
-                from infinity_client.models import OpenAIEmbeddingInputText, OpenAIEmbeddingResult
+        # try:
+        #     if reward_type == "embedding":
+        #         from infinity_client import Client
+        #         from infinity_client.api.default import embeddings
+        #         from infinity_client.models import (OpenAIEmbeddingInputText,
+        #                                             OpenAIEmbeddingResult)
 
-                with Client(base_url="http://10.110.10.3:3000") as client:
-                    embeds: OpenAIEmbeddingResult = embeddings.sync(
-                        client=client,
-                        body=OpenAIEmbeddingInputText.from_dict(
-                            {
-                                "input": [gt, answer_content],
-                                "model": "jina-embeddings-v2-base-zh",
-                            }
-                        ),
-                    )
+        #         with Client(base_url="http://10.110.10.3:3000") as client:
+        #             embeds: OpenAIEmbeddingResult = embeddings.sync(
+        #                 client=client,
+        #                 body=OpenAIEmbeddingInputText.from_dict(
+        #                     {
+        #                         "input": [gt, answer_content],
+        #                         "model": "jina-embeddings-v2-base-zh",
+        #                     }
+        #                 ),
+        #             )
 
-                    print("Use embedding model scoring!")
-                    return cosine_similarity(embeds.data[0].embedding, embeds.data[1].embedding)
-            else:
-                prompt = PROMPT.format(pred_answer=answer_content, gt_answer=gt)
-                score = json.loads(call_llm_as_a_judge(prompt))["reward"]
-                print("LLM as a judger", score)
-                return float(score)
-        except Exception as e:
-            print(f"Error during LLM scoring: {e}")
-            print("Using fallback scoring...")
-            if val_type == "em":
-                print("Using exact match scoring...")
-                if gt == answer_content:
-                    return 1.0
-            elif val_type == "f1":
-                print("Using f1 scoring...")
+        #             print("Use embedding model scoring!")
+        #             return cosine_similarity(embeds.data[0].embedding, embeds.data[1].embedding)
+        #     else:
+        #         prompt = PROMPT.format(pred_answer=answer_content, gt_answer=gt)
+        #         score = json.loads(call_llm_as_a_judge(prompt))["reward"]
+        #         print("LLM as a judger", score)
+        #         return float(score)
+        # except Exception as e:
+        # print(f"Error during LLM scoring: {e}")
+        # print("Using fallback scoring...")
+        if val_type == "em":
+            print("Using exact match scoring...")
+            if gt == answer_content:
+                return 1.0
+        elif val_type == "f1":
+            print("Using f1 scoring...")
 
-                # 将答案和参考答案分词
-                pred_tokens = set(tokenizer.encode(answer_content))
-                gt_tokens = set(tokenizer.encode(gt))
-                print("pred_tokens:", [tokenizer.decode([token]) for token in pred_tokens])
-                print("gt_tokens:", [tokenizer.decode([token]) for token in gt_tokens])
+            # 将答案和参考答案分词
+            pred_tokens = set(tokenizer.encode(answer_content))
+            gt_tokens = set(tokenizer.encode(gt))
+            print("pred_tokens:", [tokenizer.decode([token]) for token in pred_tokens])
+            print("gt_tokens:", [tokenizer.decode([token]) for token in gt_tokens])
 
-                if not gt_tokens:  # 避免除零错误
-                    continue
-                if not pred_tokens:
-                    continue
+            if not gt_tokens:  # 避免除零错误
+                continue
+            if not pred_tokens:
+                continue
 
-                # 计算共同的词数
-                common_tokens = pred_tokens & gt_tokens
+            # 计算共同的词数
+            common_tokens = pred_tokens & gt_tokens
 
-                # 计算精确率和召回率
-                precision = len(common_tokens) / len(pred_tokens) if pred_tokens else 0
-                recall = len(common_tokens) / len(gt_tokens) if gt_tokens else 0
+            # 计算精确率和召回率
+            precision = len(common_tokens) / len(pred_tokens) if pred_tokens else 0
+            recall = len(common_tokens) / len(gt_tokens) if gt_tokens else 0
 
-                # 计算F1分数
-                if precision + recall > 0:  # 避免除零错误
-                    f1 = 2 * (precision * recall) / (precision + recall)
-                    max_score = max(max_score, f1)
+            # 计算F1分数
+            if precision + recall > 0:  # 避免除零错误
+                f1 = 2 * (precision * recall) / (precision + recall)
+                max_score = max(max_score, f1)
     return max_score
 
 
@@ -204,6 +207,226 @@ def match_score(list1, list2):
     max_possible = len(list1) + len(list2) - intersection
 
     return intersection / max_possible if max_possible > 0 else 0.0
+
+
+def load_argument_config():
+    """Load argument classification configuration from JSON file."""
+    config_path = os.path.join(os.path.dirname(__file__), "argument_config.json")
+    try:
+        with open(config_path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: Configuration file {config_path} not found. Using default scoring.")
+        return None
+
+
+def exact_match_reward(predicted: Any, ground_truth: Any) -> float:
+    """Type 1: Exact Match Parameters - Binary exact match (0 or 1)"""
+    return 1.0 if predicted == ground_truth else 0.0
+
+
+def coordinate_reward(
+    pred_x: int | float, pred_y: int | float, true_x: int | float, true_y: int | float, tolerance: float = 20
+) -> float:
+    """Type 2: Coordinate Parameters - Distance-based scoring with tolerance"""
+    try:
+        distance = math.sqrt((float(pred_x) - float(true_x)) ** 2 + (float(pred_y) - float(true_y)) ** 2)
+        if distance <= tolerance:
+            return 1.0 - (distance / tolerance)
+        return 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def semantic_reward(predicted_text: str, ground_truth_text: str, tokenizer, threshold: float = 0.8) -> float:
+    """Type 3: Semantic Similarity Parameters - Semantic similarity using embeddings"""
+    try:
+        # Format texts as if they were in response tags for compute_response_score
+        formatted_predicted = f"<response>{predicted_text}</response>"
+        formatted_ground_truth = f"<response>{ground_truth_text}</response>"
+
+        # Use compute_response_score with f1 scoring
+        f1_score = compute_response_score(formatted_predicted, formatted_ground_truth, tokenizer, "embedding", "f1")
+
+        # Apply threshold like the original semantic_reward
+        return max(0.0, (f1_score - threshold) / (1.0 - threshold))
+
+    except Exception:
+        # Final fallback to simple text comparison
+        if predicted_text.lower().strip() == ground_truth_text.lower().strip():
+            return 1.0
+        return 0.0
+
+
+def cosine_similarity_text(text1: str, text2: str) -> float:
+    """Calculate cosine similarity between two text strings using embeddings if available."""
+    # try:
+    #     from infinity_client import Client
+    #     from infinity_client.api.default import embeddings
+    #     from infinity_client.models import OpenAIEmbeddingInputText, OpenAIEmbeddingResult
+
+    #     with Client(base_url="http://10.110.10.3:3000") as client:
+    #         embeds: OpenAIEmbeddingResult = embeddings.sync(
+    #             client=client,
+    #             body=OpenAIEmbeddingInputText.from_dict(
+    #                 {
+    #                     "input": [text1, text2],
+    #                     "model": "jina-embeddings-v2-base-zh",
+    #                 }
+    #             ),
+    #         )
+    #         return cosine_similarity(embeds.data[0].embedding, embeds.data[1].embedding)
+    # except Exception:
+    # Fallback: simple token-based similarity
+    tokens1 = set(text1.lower().split())
+    tokens2 = set(text2.lower().split())
+    if not tokens1 and not tokens2:
+        return 1.0
+    if not tokens1 or not tokens2:
+        return 0.0
+    intersection = len(tokens1 & tokens2)
+    union = len(tokens1 | tokens2)
+    return intersection / union if union > 0 else 0.0
+
+
+def enum_reward(predicted: Any, ground_truth: Any, valid_options: list[Any]) -> float:
+    """Type 4: Enum/Boolean Parameters - Exact match for enums, binary for booleans"""
+    if predicted == ground_truth:
+        return 1.0
+    elif predicted in valid_options:
+        return 0.5  # Partial credit for valid but incorrect choice
+    return 0.0
+
+
+def array_reward(predicted_list: list[Any], ground_truth_list: list[Any]) -> float:
+    """Type 5: Array Parameters - Jaccard similarity for overlapping elements"""
+    try:
+        pred_set = set(predicted_list) if isinstance(predicted_list, list) else set([predicted_list])
+        true_set = set(ground_truth_list) if isinstance(ground_truth_list, list) else set([ground_truth_list])
+        intersection = len(pred_set & true_set)
+        union = len(pred_set | true_set)
+        return intersection / union if union > 0 else 0.0
+    except (TypeError, AttributeError):
+        return 0.0
+
+
+def compute_coordinate_pair_score(
+    predicted_params: dict[str, Any], ground_truth_params: dict[str, Any], tool_name: str, config: dict[str, Any]
+) -> float:
+    """Compute coordinate pair score for point-based tools (click_by_point, input_by_point)."""
+    if config is None:
+        return 0.0
+
+    # Check if this is a coordinate-based tool
+    tool_spec = config.get("tool_specifications", {}).get(tool_name, {})
+    if "x" not in tool_spec or "y" not in tool_spec:
+        return 0.0
+
+    # Extract coordinates
+    pred_x = predicted_params.get("x")
+    pred_y = predicted_params.get("y")
+    gt_x = ground_truth_params.get("x")
+    gt_y = ground_truth_params.get("y")
+
+    # Check if all coordinates are present
+    if pred_x is None or pred_y is None or gt_x is None or gt_y is None:
+        return 0.0
+
+    # Get tolerance from coordinate parameter configuration
+    parameter_types = config.get("parameter_types", {})
+    coordinate_config = parameter_types.get("coordinate", {})
+    tolerance = coordinate_config.get("tolerance", 20)
+
+    # Use the coordinate_reward function to calculate the score
+    return coordinate_reward(pred_x, pred_y, gt_x, gt_y, tolerance)
+
+
+def compute_parameter_score(
+    param_name: str,
+    predicted_value: Any,
+    ground_truth_value: Any,
+    tool_name: str,
+    config: dict[str, Any],
+    tokenizer=None,
+) -> float:
+    """Compute score for a single parameter based on its type classification."""
+    if config is None:
+        # Fallback to original exact match
+        score = 1.0 if predicted_value == ground_truth_value else 0.0
+        print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (no config, exact match)")
+        return score
+
+    # Get parameter type from tool specification
+    tool_spec = config.get("tool_specifications", {}).get(tool_name, {})
+    param_type = tool_spec.get(param_name)
+
+    if param_type is None:
+        # Parameter not in configuration, use exact match as default
+        score = exact_match_reward(predicted_value, ground_truth_value)
+        print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (not in config, exact match)")
+        return score
+
+    parameter_types = config.get("parameter_types", {})
+    type_config = parameter_types.get(param_type, {})
+
+    if param_type == "exact_match":
+        score = exact_match_reward(predicted_value, ground_truth_value)
+        print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (exact_match)")
+        return score
+
+    elif param_type == "coordinate":
+        # Handle coordinate parameters with tolerance-based scoring
+        tolerance = type_config.get("tolerance", 20)
+        try:
+            # Convert to float for distance calculation
+            pred_val = float(predicted_value)
+            gt_val = float(ground_truth_value)
+            distance = abs(pred_val - gt_val)
+            if distance <= tolerance:
+                score = 1.0 - (distance / tolerance)
+            else:
+                score = 0.0
+            print(
+                f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} "
+                f"(coordinate, distance={distance}, tolerance={tolerance})"
+            )
+            return score
+        except (ValueError, TypeError):
+            # Fallback to exact match if conversion fails
+            score = exact_match_reward(predicted_value, ground_truth_value)
+            print(
+                f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} "
+                f"(coordinate fallback to exact match)"
+            )
+            return score
+
+    elif param_type == "semantic_similarity":
+        threshold = type_config.get("threshold", 0.8)
+        score = semantic_reward(str(predicted_value), str(ground_truth_value), tokenizer, threshold)
+        print(
+            f"{param_name}: '{predicted_value}' vs '{ground_truth_value}' -> {score} "
+            f"(semantic_similarity, threshold={threshold})"
+        )
+        return score
+
+    elif param_type == "enum_boolean":
+        enum_values = type_config.get("enum_values", {}).get(param_name, [])
+        score = enum_reward(predicted_value, ground_truth_value, enum_values)
+        print(
+            f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} "
+            f"(enum_boolean, valid_options={enum_values})"
+        )
+        return score
+
+    elif param_type == "array":
+        score = array_reward(predicted_value, ground_truth_value)
+        print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (array)")
+        return score
+
+    # Default fallback
+    score = exact_match_reward(predicted_value, ground_truth_value)
+    print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (default fallback)")
+    return score
 
 
 # custoimzed reward functions: format
@@ -293,7 +516,8 @@ def customize_length_reward_func(completions, answer, step, max_possible_reward,
     return rewards
 
 
-def compute_tool_call_reward(gt_tools, pd_tools, max_possible_reward, min_possible_reward):
+def compute_tool_call_reward(gt_tools, pd_tools, max_possible_reward, min_possible_reward, tokenizer=None):
+    """Compute tool call reward using argument classification system."""
     if gt_tools == pd_tools:
         print("Max possible score:", "Exact Match!")
         print("Score:", max_possible_reward)
@@ -303,6 +527,9 @@ def compute_tool_call_reward(gt_tools, pd_tools, max_possible_reward, min_possib
         print("COARSEREWARD is set to 1, so coarse reward is used")
         if gt_tools != pd_tools:
             return min_possible_reward
+
+    # Load argument classification configuration
+    config = load_argument_config()
 
     gt_names = [tool["name"] for tool in gt_tools]
     pd_names = [tool["name"] for tool in pd_tools]
@@ -340,12 +567,38 @@ def compute_tool_call_reward(gt_tools, pd_tools, max_possible_reward, min_possib
                     continue
 
             pd_params = pd_tool["arguments"]
-            param_score = match_score(list(gt_params.keys()), list(pd_params.keys()))
 
-            # Calculate correctness score for parameter values
-            correctness_score = sum(1.0 for k, v in gt_params.items() if k in pd_params and pd_params[k] == v)
+            # Use new argument classification system
+            param_scores = []
+            print(f"Scoring parameters for tool '{gt_name}':")
 
-            total_score = param_score + correctness_score
+            # Score individual parameters using classification system
+            for param_name, gt_value in gt_params.items():
+                if param_name in pd_params:
+                    pd_value = pd_params[param_name]
+                    param_score = compute_parameter_score(param_name, pd_value, gt_value, gt_name, config, tokenizer)
+                    param_scores.append(param_score)
+                else:
+                    # Missing parameter
+                    param_scores.append(0.0)
+                    print(f"{param_name}: MISSING -> 0.0")
+
+            # Add penalty for extra parameters in prediction
+            for param_name in pd_params:
+                if param_name not in gt_params:
+                    param_scores.append(0.0)  # Penalty for extra parameter
+                    print(f"{param_name}: EXTRA PARAMETER -> 0.0 (penalty)")
+
+            print(f"Parameter scores: {param_scores}, sum: {sum(param_scores) if param_scores else 0.0}")
+
+            # Calculate total score
+            if param_scores:
+                total_score = sum(param_scores)
+            else:
+                # Fallback to original scoring if no parameters
+                param_score = match_score(list(gt_params.keys()), list(pd_params.keys()))
+                correctness_score = sum(1.0 for k, v in gt_params.items() if k in pd_params and pd_params[k] == v)
+                total_score = param_score + correctness_score
 
             if total_score > best_match_score:
                 best_match_score = total_score
@@ -413,7 +666,7 @@ def customize_correctness_reward_tool(
                 pd_tools = response.split("<tool_call>")[1].split("</tool_call>")[0].strip().split("\n")
                 pd_tools = [json.loads(tool) for tool in pd_tools]
                 reward = compute_tool_call_reward(
-                    gt_tools, pd_tools, max_possible_reward, min_possible_reward
+                    gt_tools, pd_tools, max_possible_reward, min_possible_reward, tokenizer
                 )  # top reward is 2
             except Exception:
                 reward = min_possible_reward
