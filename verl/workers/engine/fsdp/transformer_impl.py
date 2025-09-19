@@ -34,13 +34,7 @@ from verl.utils import tensordict_utils as tu
 from verl.utils.activation_offload import enable_activation_offloading
 from verl.utils.checkpoint.fsdp_checkpoint_manager import FSDPCheckpointManager
 from verl.utils.debug import log_gpu_memory_usage
-from verl.utils.device import (
-    get_device_id,
-    get_device_name,
-    get_torch_device,
-    is_cuda_available,
-    is_npu_available,
-)
+from verl.utils.device import get_device_id, get_device_name, get_torch_device, is_cuda_available, is_npu_available
 from verl.utils.fsdp_utils import (
     CPUOffloadPolicy,
     FSDPModule,
@@ -646,7 +640,14 @@ class FSDPEngineWithLMHead(FSDPEngine):
         if "multi_modal_inputs" in micro_batch.keys():
             from verl.utils.model import extract_multi_modal_inputs
 
-            multi_modal_inputs = extract_multi_modal_inputs(micro_batch["multi_modal_inputs"])
+            # Add multi_modal_inputs_idx if multi_modal_inputs exist but idx doesn't
+            if "multi_modal_inputs_idx" not in micro_batch.keys():
+                micro_batch["multi_modal_inputs_idx"] = torch.tensor(
+                    list(range(len(micro_batch["multi_modal_inputs"]))), dtype=torch.int64
+                )
+
+            indices = micro_batch.get("multi_modal_inputs_idx", None)
+            multi_modal_inputs = extract_multi_modal_inputs(micro_batch["multi_modal_inputs"], indices)
 
         input_ids = micro_batch["input_ids"]
         attention_mask = micro_batch["attention_mask"]

@@ -60,7 +60,8 @@ class DataParallelPPOCritic(BasePPOCritic):
         if "multi_modal_inputs" in micro_batch.keys():
             from verl.utils.model import extract_multi_modal_inputs
 
-            multi_modal_inputs = extract_multi_modal_inputs(micro_batch["multi_modal_inputs"])
+            indices = micro_batch.get("multi_modal_inputs_idx", None)
+            multi_modal_inputs = extract_multi_modal_inputs(micro_batch["multi_modal_inputs"], indices)
 
         with torch.autocast(device_type=self.device_name, dtype=torch.bfloat16):
             input_ids = micro_batch["input_ids"]
@@ -178,6 +179,13 @@ class DataParallelPPOCritic(BasePPOCritic):
         for micro_batch in micro_batches:
             micro_batch = micro_batch.to(get_device_id())
             model_inputs = {**micro_batch.batch, **micro_batch.non_tensor_batch}
+
+            # Add multi_modal_inputs_idx if multi_modal_inputs exist but idx doesn't
+            if "multi_modal_inputs" in model_inputs and "multi_modal_inputs_idx" not in model_inputs:
+                model_inputs["multi_modal_inputs_idx"] = torch.tensor(
+                    list(range(len(model_inputs["multi_modal_inputs"]))), dtype=torch.int64
+                )
+
             with torch.no_grad():
                 values = self._forward_micro_batch(model_inputs)
             values_lst.append(values)
@@ -225,6 +233,13 @@ class DataParallelPPOCritic(BasePPOCritic):
                     micro_batch = micro_batch.to(get_device_id())
                     micro_batch_metrics = {}
                     model_inputs = {**micro_batch.batch, **micro_batch.non_tensor_batch}
+
+                    # Add multi_modal_inputs_idx if multi_modal_inputs exist but idx doesn't
+                    if "multi_modal_inputs" in model_inputs and "multi_modal_inputs_idx" not in model_inputs:
+                        model_inputs["multi_modal_inputs_idx"] = torch.tensor(
+                            list(range(len(model_inputs["multi_modal_inputs"]))), dtype=torch.int64
+                        )
+
                     response_mask = model_inputs["response_mask"]
                     values = model_inputs["values"]
                     returns = model_inputs["returns"]

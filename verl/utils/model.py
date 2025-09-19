@@ -698,14 +698,14 @@ def get_hf_auto_model_class(hf_config):
 
 def extract_multi_modal_inputs(
     batch_data: list[dict[str, torch.Tensor]],
-    indices: Optional[list[int]] = None,
+    indices: list[torch.int],
 ) -> dict[str, torch.Tensor | list[torch.Tensor]]:
     """
     Extract and process multi-modal inputs from a batch.
 
     Args:
         batch_data (list[dict[str, torch.Tensor]]): The batch containing potential multi-modal inputs
-        indices (Optional[list[int]]): If provided, only extract inputs at these indices
+        indices (list[torch.int]): Only extract inputs at these indices
 
     Returns:
         dict[str, torch.Tensor | list[torch.Tensor]]: Processed multi-modal inputs ready for model consumption
@@ -715,11 +715,7 @@ def extract_multi_modal_inputs(
     multi_modal_inputs_collected = {}
     has_image_bound = False
 
-    selected_batch_data = batch_data
-    if indices is not None:
-        selected_batch_data = [batch_data[i] for i in indices if i < len(batch_data)]
-
-    for inputs in selected_batch_data:
+    for inputs in [batch_data[i] for i in indices if i < len(batch_data)]:
         if "image_bound" in inputs:
             has_image_bound = True
         for key, value in inputs.items():
