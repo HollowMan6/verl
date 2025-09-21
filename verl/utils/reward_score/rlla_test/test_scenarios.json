@@ -1,0 +1,731 @@
+{
+  "test_scenarios": [
+    {
+      "name": "Navigate to Google",
+      "description": "Basic navigation scenario",
+      "ground_truth": [
+        {
+          "name": "navigate_to",
+          "arguments": {
+            "url": "https://www.google.com",
+            "userSidePrompt": "Opening google.com"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_match",
+          "tools": [
+            {
+              "name": "navigate_to",
+              "arguments": {
+                "url": "https://www.google.com",
+                "userSidePrompt": "Opening google.com"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "semantic_similarity",
+          "tools": [
+            {
+              "name": "navigate_to",
+              "arguments": {
+                "url": "https://www.google.com",
+                "userSidePrompt": "Navigate to Google search engine"
+              }
+            }
+          ],
+          "expected_score": 0.5
+        },
+        {
+          "name": "wrong_url",
+          "tools": [
+            {
+              "name": "navigate_to",
+              "arguments": {
+                "url": "https://www.bing.com",
+                "userSidePrompt": "Opening google.com"
+              }
+            }
+          ],
+          "expected_score": 0.3
+        }
+      ]
+    },
+    {
+      "name": "Click Search Button",
+      "description": "Element interaction scenario",
+      "ground_truth": [
+        {
+          "name": "click_element",
+          "arguments": {
+            "index": 7,
+            "button": "left",
+            "num_clicks": 1,
+            "userSidePrompt": "Click the search button"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_match",
+          "tools": [
+            {
+              "name": "click_element",
+              "arguments": {
+                "index": 7,
+                "button": "left",
+                "num_clicks": 1,
+                "userSidePrompt": "Click the search button"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "wrong_index",
+          "tools": [
+            {
+              "name": "click_element",
+              "arguments": {
+                "index": 8,
+                "button": "left",
+                "num_clicks": 1,
+                "userSidePrompt": "Click the search button"
+              }
+            }
+          ],
+          "expected_score": 0.4
+        },
+        {
+          "name": "wrong_button",
+          "tools": [
+            {
+              "name": "click_element",
+              "arguments": {
+                "index": 7,
+                "button": "right",
+                "num_clicks": 1,
+                "userSidePrompt": "Click the search button"
+              }
+            }
+          ],
+          "expected_score": 0.7
+        }
+      ]
+    },
+    {
+      "name": "Input Search Query",
+      "description": "Text input scenario",
+      "ground_truth": [
+        {
+          "name": "input_text",
+          "arguments": {
+            "index": 15,
+            "text": "machine learning tutorials",
+            "enter": true,
+            "userSidePrompt": "Enter search query and press Enter"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_match",
+          "tools": [
+            {
+              "name": "input_text",
+              "arguments": {
+                "index": 15,
+                "text": "machine learning tutorials",
+                "enter": true,
+                "userSidePrompt": "Enter search query and press Enter"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "similar_text",
+          "tools": [
+            {
+              "name": "input_text",
+              "arguments": {
+                "index": 15,
+                "text": "ML tutorials",
+                "enter": true,
+                "userSidePrompt": "Type search term and hit Enter"
+              }
+            }
+          ],
+          "expected_score": 0.8
+        },
+        {
+          "name": "wrong_enter_flag",
+          "tools": [
+            {
+              "name": "input_text",
+              "arguments": {
+                "index": 15,
+                "text": "machine learning tutorials",
+                "enter": false,
+                "userSidePrompt": "Enter search query and press Enter"
+              }
+            }
+          ],
+          "expected_score": 0.7
+        }
+      ]
+    },
+    {
+      "name": "Click by Coordinates",
+      "description": "Coordinate-based clicking scenario",
+      "ground_truth": [
+        {
+          "name": "click_by_point",
+          "arguments": {
+            "x": 250,
+            "y": 150,
+            "button": "left",
+            "num_clicks": 1,
+            "userSidePrompt": "Click on the login button"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_coordinates",
+          "tools": [
+            {
+              "name": "click_by_point",
+              "arguments": {
+                "x": 250,
+                "y": 150,
+                "button": "left",
+                "num_clicks": 1,
+                "userSidePrompt": "Click on the login button"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "close_coordinates",
+          "tools": [
+            {
+              "name": "click_by_point",
+              "arguments": {
+                "x": 255,
+                "y": 155,
+                "button": "left",
+                "num_clicks": 1,
+                "userSidePrompt": "Click login button"
+              }
+            }
+          ],
+          "expected_score": 0.6
+        },
+        {
+          "name": "far_coordinates",
+          "tools": [
+            {
+              "name": "click_by_point",
+              "arguments": {
+                "x": 300,
+                "y": 200,
+                "button": "left",
+                "num_clicks": 1,
+                "userSidePrompt": "Click login button"
+              }
+            }
+          ],
+          "expected_score": 0.3
+        }
+      ]
+    },
+    {
+      "name": "Upload Files",
+      "description": "File upload scenario with array arguments",
+      "ground_truth": [
+        {
+          "name": "click_upload_file",
+          "arguments": {
+            "index": 12,
+            "file_paths": ["/home/user/document1.pdf", "/home/user/document2.pdf"],
+            "userSidePrompt": "Upload documents"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "all_files",
+          "tools": [
+            {
+              "name": "click_upload_file",
+              "arguments": {
+                "index": 12,
+                "file_paths": ["/home/user/document1.pdf", "/home/user/document2.pdf"],
+                "userSidePrompt": "Upload documents"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "partial_files",
+          "tools": [
+            {
+              "name": "click_upload_file",
+              "arguments": {
+                "index": 12,
+                "file_paths": ["/home/user/document1.pdf"],
+                "userSidePrompt": "Upload documents"
+              }
+            }
+          ],
+          "expected_score": 0.6
+        },
+        {
+          "name": "different_files",
+          "tools": [
+            {
+              "name": "click_upload_file",
+              "arguments": {
+                "index": 12,
+                "file_paths": ["/home/user/image.jpg"],
+                "userSidePrompt": "Upload documents"
+              }
+            }
+          ],
+          "expected_score": 0.4
+        }
+      ]
+    },
+    {
+      "name": "Human Interaction",
+      "description": "Human interaction with complex enum and array arguments",
+      "ground_truth": [
+        {
+          "name": "human_interact",
+          "arguments": {
+            "interactType": "select",
+            "prompt": "Choose your preferred programming language",
+            "selectOptions": ["Python", "JavaScript", "Java"],
+            "selectMultiple": false
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_match",
+          "tools": [
+            {
+              "name": "human_interact",
+              "arguments": {
+                "interactType": "select",
+                "prompt": "Choose your preferred programming language",
+                "selectOptions": ["Python", "JavaScript", "Java"],
+                "selectMultiple": false
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "wrong_interaction_type",
+          "tools": [
+            {
+              "name": "human_interact",
+              "arguments": {
+                "interactType": "input",
+                "prompt": "Choose your preferred programming language",
+                "selectOptions": ["Python", "JavaScript", "Java"],
+                "selectMultiple": false
+              }
+            }
+          ],
+          "expected_score": 0.6
+        },
+        {
+          "name": "partial_options",
+          "tools": [
+            {
+              "name": "human_interact",
+              "arguments": {
+                "interactType": "select",
+                "prompt": "Select programming language",
+                "selectOptions": ["Python", "JavaScript"],
+                "selectMultiple": false
+              }
+            }
+          ],
+          "expected_score": 0.8
+        }
+      ]
+    },
+    {
+      "name": "Complex Workflow",
+      "description": "Multi-step workflow scenario",
+      "ground_truth": [
+        {
+          "name": "navigate_to",
+          "arguments": {
+            "url": "https://github.com",
+            "userSidePrompt": "Navigate to GitHub"
+          }
+        },
+        {
+          "name": "click_element",
+          "arguments": {
+            "index": 5,
+            "userSidePrompt": "Click the search button"
+          }
+        },
+        {
+          "name": "input_text",
+          "arguments": {
+            "index": 10,
+            "text": "python machine learning",
+            "enter": true,
+            "userSidePrompt": "Search for ML repositories"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_workflow",
+          "tools": [
+            {
+              "name": "navigate_to",
+              "arguments": {
+                "url": "https://github.com",
+                "userSidePrompt": "Navigate to GitHub"
+              }
+            },
+            {
+              "name": "click_element",
+              "arguments": {
+                "index": 5,
+                "userSidePrompt": "Click the search button"
+              }
+            },
+            {
+              "name": "input_text",
+              "arguments": {
+                "index": 10,
+                "text": "python machine learning",
+                "enter": true,
+                "userSidePrompt": "Search for ML repositories"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "one_wrong_step",
+          "tools": [
+            {
+              "name": "navigate_to",
+              "arguments": {
+                "url": "https://github.com",
+                "userSidePrompt": "Navigate to GitHub"
+              }
+            },
+            {
+              "name": "click_element",
+              "arguments": {
+                "index": 6,
+                "userSidePrompt": "Click the search button"
+              }
+            },
+            {
+              "name": "input_text",
+              "arguments": {
+                "index": 10,
+                "text": "python machine learning",
+                "enter": true,
+                "userSidePrompt": "Search for ML repositories"
+              }
+            }
+          ],
+          "expected_score": 0.4
+        }
+      ]
+    },
+    {
+      "name": "Scroll and Extract",
+      "description": "Page scrolling with content extraction",
+      "ground_truth": [
+        {
+          "name": "scroll_mouse_wheel",
+          "arguments": {
+            "amount": 3,
+            "direction": "down",
+            "extract_page_content": true,
+            "userSidePrompt": "Scroll down to load more content"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "exact_match",
+          "tools": [
+            {
+              "name": "scroll_mouse_wheel",
+              "arguments": {
+                "amount": 3,
+                "direction": "down",
+                "extract_page_content": true,
+                "userSidePrompt": "Scroll down to load more content"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "different_amount",
+          "tools": [
+            {
+              "name": "scroll_mouse_wheel",
+              "arguments": {
+                "amount": 5,
+                "direction": "down",
+                "extract_page_content": true,
+                "userSidePrompt": "Scroll down to see more"
+              }
+            }
+          ],
+          "expected_score": 0.7
+        },
+        {
+          "name": "wrong_direction",
+          "tools": [
+            {
+              "name": "scroll_mouse_wheel",
+              "arguments": {
+                "amount": 3,
+                "direction": "up",
+                "extract_page_content": true,
+                "userSidePrompt": "Scroll down to load more content"
+              }
+            }
+          ],
+          "expected_score": 0.5
+        }
+      ]
+    },
+    {
+      "name": "Variable Storage",
+      "description": "Variable storage and retrieval scenario",
+      "ground_truth": [
+        {
+          "name": "variable_storage",
+          "arguments": {
+            "operation": "write_variable",
+            "name": "search_query",
+            "value": "artificial intelligence"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "perfect_match",
+          "tools": [
+            {
+              "name": "variable_storage",
+              "arguments": {
+                "operation": "write_variable",
+                "name": "search_query",
+                "value": "artificial intelligence"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "similar_value",
+          "tools": [
+            {
+              "name": "variable_storage",
+              "arguments": {
+                "operation": "write_variable",
+                "name": "search_query",
+                "value": "AI and machine learning"
+              }
+            }
+          ],
+          "expected_score": 0.8
+        },
+        {
+          "name": "wrong_operation",
+          "tools": [
+            {
+              "name": "variable_storage",
+              "arguments": {
+                "operation": "read_variable",
+                "name": "search_query",
+                "value": "artificial intelligence"
+              }
+            }
+          ],
+          "expected_score": 0.6
+        }
+      ]
+    },
+    {
+      "name": "ForEach Task",
+      "description": "Loop iteration with progress tracking",
+      "ground_truth": [
+        {
+          "name": "foreach_task",
+          "arguments": {
+            "nodeId": 42,
+            "progress": "Processing item 3 of 10",
+            "next_step": "Click on the next repository link"
+          }
+        }
+      ],
+      "predictions": [
+        {
+          "name": "exact_match",
+          "tools": [
+            {
+              "name": "foreach_task",
+              "arguments": {
+                "nodeId": 42,
+                "progress": "Processing item 3 of 10",
+                "next_step": "Click on the next repository link"
+              }
+            }
+          ],
+          "expected_score": 1.0
+        },
+        {
+          "name": "different_progress",
+          "tools": [
+            {
+              "name": "foreach_task",
+              "arguments": {
+                "nodeId": 42,
+                "progress": "Handling item 3 out of 10",
+                "next_step": "Click the next repo link"
+              }
+            }
+          ],
+          "expected_score": 0.5
+        },
+        {
+          "name": "wrong_node_id",
+          "tools": [
+            {
+              "name": "foreach_task",
+              "arguments": {
+                "nodeId": 43,
+                "progress": "Processing item 3 of 10",
+                "next_step": "Click on the next repository link"
+              }
+            }
+          ],
+          "expected_score": 0.3
+        }
+      ]
+    }
+  ],
+  "edge_cases": [
+    {
+      "name": "Missing arguments",
+      "description": "Handle missing required arguments",
+      "ground_truth": [
+        {
+          "name": "click_element",
+          "arguments": {
+            "index": 5,
+            "userSidePrompt": "Click button"
+          }
+        }
+      ],
+      "prediction": [
+        {
+          "name": "click_element",
+          "arguments": {
+            "userSidePrompt": "Click button"
+          }
+        }
+      ],
+      "expected_behavior": "Should handle gracefully with partial score"
+    },
+    {
+      "name": "Extra arguments",
+      "description": "Handle extra unexpected arguments",
+      "ground_truth": [
+        {
+          "name": "navigate_to",
+          "arguments": {
+            "url": "https://example.com",
+            "userSidePrompt": "Navigate to site"
+          }
+        }
+      ],
+      "prediction": [
+        {
+          "name": "navigate_to",
+          "arguments": {
+            "url": "https://example.com",
+            "userSidePrompt": "Navigate to site",
+            "extra_param": "unexpected_value"
+          }
+        }
+      ],
+      "expected_behavior": "Should ignore extra arguments without penalty"
+    },
+    {
+      "name": "Wrong Tool Name",
+      "description": "Completely wrong tool selection",
+      "ground_truth": [
+        {
+          "name": "click_element",
+          "arguments": {
+            "index": 5,
+            "userSidePrompt": "Click button"
+          }
+        }
+      ],
+      "prediction": [
+        {
+          "name": "navigate_to",
+          "arguments": {
+            "url": "https://example.com",
+            "userSidePrompt": "Click button"
+          }
+        }
+      ],
+      "expected_behavior": "Should receive very low score"
+    },
+    {
+      "name": "Invalid Coordinate Types",
+      "description": "Handle non-numeric coordinates",
+      "ground_truth": [
+        {
+          "name": "click_by_point",
+          "arguments": {
+            "x": 100,
+            "y": 150,
+            "userSidePrompt": "Click point"
+          }
+        }
+      ],
+      "prediction": [
+        {
+          "name": "click_by_point",
+          "arguments": {
+            "x": "invalid",
+            "y": "coordinates",
+            "userSidePrompt": "Click point"
+          }
+        }
+      ],
+      "expected_behavior": "Should handle gracefully with 0 coordinate score"
+    }
+  ]
+}
