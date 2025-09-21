@@ -1,0 +1,156 @@
+{
+  "parameter_types": {
+    "exact_match": {
+      "type": 1,
+      "description": "Binary exact match (0 or 1)",
+      "parameters": [
+        "index", "url", "tabId", "fileChooserId", "duration", "num_clicks", "amount", "nodeId"
+      ]
+    },
+    "coordinate": {
+      "type": 2,
+      "description": "Distance-based scoring with tolerance",
+      "parameters": ["x", "y"],
+      "tolerance": 20
+    },
+    "semantic_similarity": {
+      "type": 3,
+      "description": "Semantic similarity using embeddings",
+      "parameters": [
+        "userSidePrompt", "text", "option", "prompt", "name", "value", "title", 
+        "progress", "next_step"
+      ],
+      "threshold": 0.5
+    },
+    "enum_boolean": {
+      "type": 4,
+      "description": "Exact match for enums, binary for booleans",
+      "parameters": [
+        "button", "direction", "enter", "interactType", "operation",
+        "extract_page_content", "helpType", "selectMultiple"
+      ],
+      "enum_values": {
+        "button": ["left", "right", "middle"],
+        "direction": ["up", "down"],
+        "enter": [true, false],
+        "interactType": ["confirm", "input", "select", "request_help"],
+        "operation": ["read_variable", "write_variable", "list_all_variable"],
+        "extract_page_content": [true, false],
+        "helpType": ["request_login", "request_assistance"],
+        "selectMultiple": [true, false]
+      }
+    },
+    "array": {
+      "type": 5,
+      "description": "Jaccard similarity for overlapping elements",
+      "parameters": ["file_paths", "files", "selectOptions"]
+    }
+  },
+  "tool_specifications": {
+    "navigate_to": {
+      "url": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "current_page": {
+      "userSidePrompt": "semantic_similarity"
+    },
+    "go_back": {
+      "userSidePrompt": "semantic_similarity"
+    },
+    "input_text": {
+      "text": "semantic_similarity",
+      "enter": "enum_boolean",
+      "index": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "click_element": {
+      "index": "exact_match",
+      "button": "enum_boolean",
+      "num_clicks": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "scroll_mouse_wheel": {
+      "amount": "exact_match",
+      "direction": "enum_boolean",
+      "userSidePrompt": "semantic_similarity",
+      "extract_page_content": "enum_boolean"
+    },
+    "hover_to_element": {
+      "index": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "extract_page_content": {
+      "userSidePrompt": "semantic_similarity"
+    },
+    "get_select_options": {
+      "index": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "select_option": {
+      "index": "exact_match",
+      "option": "semantic_similarity",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "get_all_tabs": {
+      "userSidePrompt": "semantic_similarity"
+    },
+    "switch_tab": {
+      "tabId": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "wait": {
+      "duration": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "human_interact": {
+      "interactType": "enum_boolean",
+      "prompt": "semantic_similarity",
+      "helpType": "enum_boolean",
+      "selectOptions": "array",
+      "selectMultiple": "enum_boolean"
+    },
+    "click_upload_file": {
+      "index": "exact_match",
+      "file_paths": "array",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "download_by_url": {
+      "url": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "input_by_point": {
+      "x": "coordinate",
+      "y": "coordinate",
+      "text": "semantic_similarity",
+      "enter": "enum_boolean",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "click_by_point": {
+      "x": "coordinate",
+      "y": "coordinate",
+      "button": "enum_boolean",
+      "num_clicks": "exact_match",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "variable_storage": {
+      "operation": "enum_boolean",
+      "name": "semantic_similarity",
+      "value": "semantic_similarity"
+    },
+    "foreach_task": {
+      "nodeId": "exact_match",
+      "progress": "semantic_similarity",
+      "next_step": "semantic_similarity"
+    },
+    "key_result_url": {
+      "url": "exact_match",
+      "title": "semantic_similarity",
+      "userSidePrompt": "semantic_similarity"
+    },
+    "upload_file": {
+      "fileChooserId": "exact_match",
+      "files": "array",
+      "userSidePrompt": "semantic_similarity"
+    }
+  }
+}
