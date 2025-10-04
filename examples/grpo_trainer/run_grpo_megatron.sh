@@ -1,5 +1,5 @@
-TP=2
-PP=2
+TP=4
+PP=1
 
 # convert HF model to meagatron format offlinely
 # python scripts/converter_hf_to_mcore.py --hf_model_path $HF_MODEL_PATH --output_path $DIST_CKPT_PATH
@@ -22,7 +22,6 @@ python3 -m verl.trainer.main_ppo --config-path=config \
     data.train_batch_size=512 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
-    data.return_multi_modal_inputs=False \
     data.max_prompt_length=28672 \
     data.max_response_length=4096 \
     actor_rollout_ref.model.path=$BASE_MODEL \
@@ -40,17 +39,17 @@ python3 -m verl.trainer.main_ppo --config-path=config \
     actor_rollout_ref.actor.megatron.tensor_model_parallel_size=$TP \
     actor_rollout_ref.actor.megatron.pipeline_model_parallel_size=$PP \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$ROLLOUT_TP_SIZE \
-    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=2 \
+    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=True \
     actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=32768 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.max_num_batched_tokens=32768 \
     actor_rollout_ref.rollout.n=8 \
     +actor_rollout_ref.rollout.engine_kwargs.vllm.disable_mm_preprocessor_cache=True \
-    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=2 \
+    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True \
     actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=32768 \
     actor_rollout_ref.ref.megatron.tensor_model_parallel_size=$TP \
@@ -66,7 +65,7 @@ python3 -m verl.trainer.main_ppo --config-path=config \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
-    trainer.project_name=AgentRL \
+    trainer.project_name=Qwen2.5VL \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$N_GPUS \
     trainer.nnodes=1 \
