@@ -2,7 +2,9 @@
 export N_GPUS=8
 export ROLLOUT_TP_SIZE=1
 export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True
-# export VLLM_ATTENTION_BACKEND=XFORMERS
+export VLLM_USE_V1=1
+export VLLM_FLASH_ATTN_VERSION=3
+export VLLM_ENABLE_V1_MULTIPROCESSING=1
 
 # All the env variables below are set to 0 by default
 export WITHLENGTH=0
@@ -21,4 +23,5 @@ export PYTHONUNBUFFERED=1
 export DATA_DIR="./dataset"
 export BASE_MODEL="/mnt/workspace/models/xxx" # e.g., "Qwen2.5-3b-Instruct"
 export EXPERIMENT_NAME="qwen2.5_vl-7b" # e.g., "grpo-qwen2.5-3b"
+export DIST_CKPT_PATH="/mnt/workspace/models/mcore_ckpt/xxx"
 bash ./examples/grpo_trainer/run_grpo.sh
