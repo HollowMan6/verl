@@ -23,5 +23,4 @@ export PYTHONUNBUFFERED=1
 export DATA_DIR="./dataset"
 export BASE_MODEL="/mnt/workspace/models/xxx" # e.g., "Qwen2.5-3b-Instruct"
 export EXPERIMENT_NAME="qwen2.5_vl-7b" # e.g., "grpo-qwen2.5-3b"
-export DIST_CKPT_PATH="/mnt/workspace/models/mcore_ckpt/xxx"
 bash ./examples/grpo_trainer/run_grpo.sh
