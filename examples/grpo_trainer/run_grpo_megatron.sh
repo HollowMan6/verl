@@ -1,8 +1,10 @@
 TP=4
 PP=1
+EP=1
+ETP=1
 
 # convert HF model to meagatron format offlinely
-# python scripts/converter_hf_to_mcore.py --hf_model_path $HF_MODEL_PATH --output_path $DIST_CKPT_PATH
+# python scripts/converter_hf_to_mcore.py --hf_model_path $BASE_MODEL --output_path $DIST_CKPT_PATH
 
 # megatron tuning guide:
 # 1. recommend to offload all states by setting ALL_OFFLOAD=True
@@ -13,6 +15,16 @@ PP=1
 #        +actor_rollout_ref.actor.megatron.override_transformer_config.recompute_method=uniform \
 #        +actor_rollout_ref.actor.megatron.override_transformer_config.recompute_granularity=full \
 #        +actor_rollout_ref.actor.megatron.override_transformer_config.recompute_num_layers=1 \
+
+ALL_OFFLOAD=${ALL_OFFLOAD:-False}
+COMMON_PARAM_OFFLOAD=${COMMON_PARAM_OFFLOAD:-$ALL_OFFLOAD}
+COMMON_GRAD_OFFLOAD=${COMMON_GRAD_OFFLOAD:-$ALL_OFFLOAD}
+COMMON_OPTIMIZER_OFFLOAD=${COMMON_OPTIMIZER_OFFLOAD:-$ALL_OFFLOAD}
+
+ACTOR_PARAM_OFFLOAD=${ACTOR_PARAM_OFFLOAD:-$COMMON_PARAM_OFFLOAD}
+ACTOR_GRAD_OFFLOAD=${ACTOR_GRAD_OFFLOAD:-$COMMON_GRAD_OFFLOAD}
+ACTOR_OPTIMIZER_OFFLOAD=${ACTOR_OPTIMIZER_OFFLOAD:-$COMMON_OPTIMIZER_OFFLOAD}
+REF_PARAM_OFFLOAD=${REF_PARAM_OFFLOAD:-$COMMON_PARAM_OFFLOAD}
 
 python3 -m verl.trainer.main_ppo --config-path=config \
     --config-name='ppo_megatron_trainer.yaml'\
@@ -35,7 +47,7 @@ python3 -m verl.trainer.main_ppo --config-path=config \
     actor_rollout_ref.actor.kl_loss_coef=0.01 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.entropy_coeff=0 \
-    actor_rollout_ref.actor.megatron.override_transformer_config.recompute_granularity="selective" \
+    actor_rollout_ref.actor.megatron.use_mbridge=True \
     actor_rollout_ref.actor.megatron.tensor_model_parallel_size=$TP \
     actor_rollout_ref.actor.megatron.pipeline_model_parallel_size=$PP \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$ROLLOUT_TP_SIZE \
@@ -43,7 +55,7 @@ python3 -m verl.trainer.main_ppo --config-path=config \
     actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=True \
     actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=32768 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.max_num_batched_tokens=32768 \
@@ -54,10 +66,20 @@ python3 -m verl.trainer.main_ppo --config-path=config \
     actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=32768 \
     actor_rollout_ref.ref.megatron.tensor_model_parallel_size=$TP \
     actor_rollout_ref.ref.megatron.pipeline_model_parallel_size=$PP \
-    actor_rollout_ref.actor.megatron.use_dist_checkpointing=True \
-    actor_rollout_ref.ref.megatron.use_dist_checkpointing=True \
-    actor_rollout_ref.actor.megatron.dist_checkpointing_path=$DIST_CKPT_PATH \
-    actor_rollout_ref.ref.megatron.dist_checkpointing_path=$DIST_CKPT_PATH \
+    actor_rollout_ref.actor.megatron.expert_model_parallel_size=$EP \
+    actor_rollout_ref.actor.megatron.expert_tensor_parallel_size=$ETP \
+    actor_rollout_ref.ref.megatron.expert_model_parallel_size=$EP \
+    actor_rollout_ref.ref.megatron.expert_tensor_parallel_size=$ETP \
+    actor_rollout_ref.ref.megatron.param_offload=${offload} \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.apply_rope_fusion=True \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.moe_router_dtype=fp32 \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.moe_enable_deepep=True \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.moe_token_dispatcher_type=flex \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.recompute_method=uniform \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.recompute_granularity=full \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.recompute_num_layers=1 \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.gradient_accumulation_fusion=True \
+    +actor_rollout_ref.actor.megatron.override_transformer_config.moe_permute_fusion=True \
     actor_rollout_ref.actor.megatron.param_offload=${ACTOR_PARAM_OFFLOAD} \
     actor_rollout_ref.actor.megatron.optimizer_offload=${ACTOR_OPTIMIZER_OFFLOAD} \
     actor_rollout_ref.actor.megatron.grad_offload=${ACTOR_GRAD_OFFLOAD} \

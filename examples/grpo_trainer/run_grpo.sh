@@ -1,6 +1,6 @@
 python3 -m verl.trainer.main_ppo \
-    actor_rollout_ref.ref.strategy=fsdp2 \
-    actor_rollout_ref.actor.strategy=fsdp2 \
+    actor_rollout_ref.ref.strategy=fsdp \
+    actor_rollout_ref.actor.strategy=fsdp \
     algorithm.adv_estimator=grpo \
     data.train_files=$DATA_DIR/train.parquet \
     data.val_files=$DATA_DIR/test.parquet \
@@ -10,6 +10,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_prompt_length=28672 \
     data.max_response_length=4096 \
     actor_rollout_ref.model.path=$BASE_MODEL \
+    actor_rollout_ref.model.use_fused_kernels=True \
     actor_rollout_ref.actor.optim.lr=3e-6 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2 \
@@ -27,7 +28,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$ROLLOUT_TP_SIZE \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.max_num_batched_tokens=32768 \
