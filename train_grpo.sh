@@ -21,6 +21,6 @@ export RAY_DEDUP_LOGS=0
 export PYTHONUNBUFFERED=1
 
 export DATA_DIR="./dataset"
-export BASE_MODEL="/mnt/workspace/models/Qwen2.5-VL-7B-Instruct" # e.g., "Qwen2.5-3b-Instruct"
-export EXPERIMENT_NAME="qwen2.5_vl-7b" # e.g., "grpo-qwen2.5-3b"
+export BASE_MODEL="/mnt/workspace/models/Qwen3-VL-8B-Thinking" # e.g., "Qwen2.5-3b-Instruct"
+export EXPERIMENT_NAME="qwen3_vl-8b" # e.g., "grpo-qwen2.5-3b"
 bash ./examples/grpo_trainer/run_grpo.sh
