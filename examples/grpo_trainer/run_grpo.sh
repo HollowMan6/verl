@@ -10,6 +10,11 @@ python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=True \
     data.max_prompt_length=49152 \
     data.max_response_length=16384 \
+    data.shuffle=True \
+    data.seed=42 \
+    data.train_max_samples=20000 \
+    data.val_max_samples=50 \
+    data.filter_overlong_prompts_workers=172 \
     actor_rollout_ref.model.path=$BASE_MODEL \
     actor_rollout_ref.model.use_fused_kernels=True \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
@@ -30,7 +35,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$ROLLOUT_TP_SIZE \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.7 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.max_num_batched_tokens=65536 \
