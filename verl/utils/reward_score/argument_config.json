@@ -1,5 +1,10 @@
 {
   "parameter_types": {
+    "ignore": {
+      "type": 0,
+      "description": "Ignore parameter - always returns 1.0 (no penalty)",
+      "parameters": ["userSidePrompt"]
+    },
     "exact_match": {
       "type": 1,
       "description": "Binary exact match (0 or 1)",
@@ -49,58 +54,58 @@
   "tool_specifications": {
     "navigate_to": {
       "url": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "current_page": {
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "go_back": {
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "input_text": {
       "text": "semantic_similarity",
       "enter": "enum_boolean",
       "index": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "click_element": {
       "index": "exact_match",
       "button": "enum_boolean",
       "num_clicks": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "scroll_mouse_wheel": {
       "amount": "exact_match",
       "direction": "enum_boolean",
-      "userSidePrompt": "semantic_similarity",
+      "userSidePrompt": "ignore",
       "extract_page_content": "enum_boolean"
     },
     "hover_to_element": {
       "index": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "extract_page_content": {
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "get_select_options": {
       "index": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "select_option": {
       "index": "exact_match",
       "option": "semantic_similarity",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "get_all_tabs": {
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "switch_tab": {
       "tabId": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "wait": {
       "duration": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "human_interact": {
       "interactType": "enum_boolean",
@@ -112,25 +117,25 @@
     "click_upload_file": {
       "index": "exact_match",
       "file_paths": "array",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "download_by_url": {
       "url": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "input_by_point": {
       "x": "coordinate",
       "y": "coordinate",
       "text": "semantic_similarity",
       "enter": "enum_boolean",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "click_by_point": {
       "x": "coordinate",
       "y": "coordinate",
       "button": "enum_boolean",
       "num_clicks": "exact_match",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "variable_storage": {
       "operation": "enum_boolean",
@@ -145,12 +150,12 @@
     "key_result_url": {
       "url": "exact_match",
       "title": "semantic_similarity",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     },
     "upload_file": {
       "fileChooserId": "exact_match",
       "files": "array",
-      "userSidePrompt": "semantic_similarity"
+      "userSidePrompt": "ignore"
     }
   }
 }

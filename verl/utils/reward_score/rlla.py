@@ -369,7 +369,13 @@ def compute_parameter_score(
     parameter_types = config.get("parameter_types", {})
     type_config = parameter_types.get(param_type, {})
 
-    if param_type == "exact_match":
+    if param_type == "ignore":
+        # Ignore parameter - always return 1.0 (no penalty)
+        score = 1.0
+        print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (ignore)")
+        return score
+
+    elif param_type == "exact_match":
         score = exact_match_reward(predicted_value, ground_truth_value)
         print(f"{param_name}: {predicted_value} vs {ground_truth_value} -> {score} (exact_match)")
         return score
