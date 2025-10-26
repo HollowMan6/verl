@@ -22,10 +22,10 @@ loss_agg_mode="token-mean"
 enable_filter_groups=True
 filter_groups_metric=acc
 max_num_gen_batches=10
-train_prompt_bsz=512
+train_prompt_bsz=256
 gen_prompt_bsz=$((train_prompt_bsz * 3))
 n_resp_per_prompt=16
-train_prompt_mini_bsz=32
+train_prompt_mini_bsz=16
 
 # Paths
 NNODES=${NNODES:-1}
@@ -52,10 +52,11 @@ python3 -m recipe.dapo.main_dapo \
     data.train_files="${TRAIN_FILE}" \
     data.val_files="${TEST_FILE}" \
     data.prompt_key=prompt \
-    data.truncation='left' \
+    data.truncation='error' \
+    data.filter_overlong_prompts=True \
     data.shuffle=True \
     data.seed=42 \
-    data.train_max_samples=40000 \
+    data.train_max_samples=50000 \
     data.val_max_samples=50 \
     data.max_prompt_length=${max_prompt_length} \
     data.max_response_length=${max_response_length} \
