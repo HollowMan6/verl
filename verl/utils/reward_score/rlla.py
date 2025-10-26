@@ -89,7 +89,7 @@ def preprocess_text(text: str) -> str:
 
     处理步骤:
     1. 转换为小写
-    # 2. 移除标点符号 (.,!?;:'"()[]{}...)
+    2. 移除标点符号 (.,!?;:'"()[]{}...)
     3. 去除多余空格
     """
     # # 将标点符号替换为空格
@@ -651,7 +651,7 @@ def customize_correctness_reward_tool(
         reward = 0.0
 
         if reward_type == "tool_use":
-            if "<tool_call>" not in ans:
+            if "<tool_call>" not in ans or "</tool_call>" not in ans.split("<tool_call>")[1]:
                 # if "<tool_call>" not in response and "</tool_call>" not in response:
                 #     reward = max_possible_reward
                 # else:
@@ -718,8 +718,8 @@ def compute_score(solution_str, ground_truth, extra_info, tokenizer, step=0):
         tool_max_possible = 3.0
         tool_min_possible = -3.0
 
-    format_max_possible = 1.0
-    format_min_possible = 0.0
+    # format_max_possible = 1.0
+    # format_min_possible = 0.0
 
     length_max_possible = 1.0
     length_min_possible = 0.0
@@ -727,9 +727,10 @@ def compute_score(solution_str, ground_truth, extra_info, tokenizer, step=0):
     completions = [[{"role": "assistant", "content": predict_str}]]
     answer = [ground_truth]
 
-    format_score = customize_format_reward_func(completions, answer, step, format_max_possible, format_min_possible)[
-        0
-    ]  # , extra_info["type"]
+    # format_score = customize_format_reward_func(completions, answer, step, format_max_possible, format_min_possible)[
+    #     0
+    # ]  # , extra_info["type"]
+    format_score = 0
     correctness_score = customize_correctness_reward_tool(
         completions, answer, step, tool_max_possible, tool_min_possible, tokenizer
     )[0]  # , extra_info["type"]
@@ -742,11 +743,11 @@ def compute_score(solution_str, ground_truth, extra_info, tokenizer, step=0):
     else:
         length_score = 0
 
-    score = format_score + correctness_score + length_score
+    score = format_score + correctness_score / 3 + length_score
 
     return {
         "score": score,
         "format_score": format_score,
-        "correctness_score": correctness_score,
+        "correctness_score": correctness_score / 3,
         "length_score": length_score,
     }

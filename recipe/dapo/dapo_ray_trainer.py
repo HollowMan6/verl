@@ -214,9 +214,14 @@ class RayDAPOTrainer(RayPPOTrainer):
                             new_batch = new_batch.union(reward_tensor)
 
                         # we combine with rule-based rm
-                        reward_tensor, reward_extra_infos_dict = compute_reward(new_batch, self.reward_fn)
+                        reward_tensor, format_tensor, correctness_tensor, length_tensor, reward_extra_infos_dict = (
+                            compute_reward(new_batch, self.global_steps, self.reward_fn)
+                        )
 
                         new_batch.batch["token_level_scores"] = reward_tensor
+                        new_batch.batch["token_level_scores_format"] = format_tensor
+                        new_batch.batch["token_level_scores_correctness"] = correctness_tensor
+                        new_batch.batch["token_level_scores_length"] = length_tensor
 
                         if reward_extra_infos_dict:
                             new_batch.non_tensor_batch.update(
