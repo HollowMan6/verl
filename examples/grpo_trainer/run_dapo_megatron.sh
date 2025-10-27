@@ -25,7 +25,7 @@ max_num_gen_batches=10
 train_prompt_bsz=128
 gen_prompt_bsz=$((train_prompt_bsz * 3))
 n_resp_per_prompt=16
-train_prompt_mini_bsz=16
+train_prompt_mini_bsz=8
 
 # Paths
 NNODES=${NNODES:-1}
@@ -164,7 +164,7 @@ python3  -m recipe.dapo.main_dapo \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes="${NNODES}" \
     trainer.val_before_train=True \
-    trainer.save_freq=10 \
+    trainer.save_freq=1 \
     trainer.test_freq=5 \
     trainer.total_epochs=5 \
     trainer.resume_mode=auto
