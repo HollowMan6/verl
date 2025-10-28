@@ -19,8 +19,7 @@ import ray
 
 from verl import DataProto
 from verl.trainer.ppo.reward import compute_reward, get_custom_reward_fn
-
-from .reward_score import _default_compute_score
+from verl.utils.reward_score import default_compute_score
 
 
 def load_reward_manager(config, tokenizer, num_examine, **reward_kwargs):
@@ -61,10 +60,10 @@ def load_reward_manager(config, tokenizer, num_examine, **reward_kwargs):
             # Create a semaphore to control concurrent access to the sandbox
             _concurrent_semaphore = sandbox_manager.Semaphore(sandbox_config.get("max_concurrent", 64))
             final_compute_score = partial(
-                _default_compute_score, sandbox_fusion_url=sandbox_url, concurrent_semaphore=_concurrent_semaphore
+                default_compute_score, sandbox_fusion_url=sandbox_url, concurrent_semaphore=_concurrent_semaphore
             )
         else:
-            final_compute_score = _default_compute_score
+            final_compute_score = default_compute_score
 
     # Instantiate and return the reward manager with the specified parameters
     return reward_manager_cls(
