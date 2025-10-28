@@ -6,6 +6,7 @@ export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True
 export VLLM_USE_V1=1
 export VLLM_FLASH_ATTN_VERSION=3
 export VLLM_ENABLE_V1_MULTIPROCESSING=1
+export HYDRA_FULL_ERROR=1
 
 # All the env variables below are set to 0 by default
 export WITHLENGTH=0
