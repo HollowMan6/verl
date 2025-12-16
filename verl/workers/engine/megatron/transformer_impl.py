@@ -126,7 +126,9 @@ class MegatronEngine(BaseEngine):
                 self.model_config.local_path, trust_remote_code=self.model_config.trust_remote_code
             )
             # Get Megatron provider and configure it
-            provider = bridge.to_megatron_provider(load_weights=False)
+            provider = bridge.to_megatron_provider(
+                load_weights=self.engine_config.modelopt_quantization.get("enabled", False)
+            )
 
             # In case of invalid overrides, we need to make sure some critical params are set correctly
             provider.params_dtype = self.param_dtype
@@ -151,6 +153,14 @@ class MegatronEngine(BaseEngine):
             # Apply transformer config overrides
             for key, value in override_transformer_config.items():
                 setattr(provider, key, value)
+
+            quant_cfg = self.engine_config.get("modelopt_quantization", {})
+            if quant_cfg.get("enabled", False):
+                provider.restore_modelopt_state = True
+                # Quantization layer spec uses SequentialMLP which is incompatible with MoE permute fusion
+                provider.moe_permute_fusion = False
+                if self.engine_config.use_remove_padding:
+                    provider.use_arbitrary_attention_mask = False
 
             provider.finalize()
             self.provider = provider
@@ -183,10 +193,9 @@ class MegatronEngine(BaseEngine):
 
         self.is_value_model = is_value_model
 
-        if self.engine_config.forward_only:
-            wrap_with_ddp = False
-        else:
-            wrap_with_ddp = True
+        wrap_with_ddp = not self.engine_config.forward_only
+
+        quant_cfg_dict = self.engine_config.modelopt_quantization
 
         wrap_config = McoreModuleWrapperConfig(
             is_value_model=is_value_model,  # actor is not value model
@@ -204,6 +213,8 @@ class MegatronEngine(BaseEngine):
             override_ddp_config=self.engine_config.override_ddp_config,
             peft_cls=self.peft_cls,
             peft_config=self.model_config.get("lora", None),
+            modelopt_quantization=quant_cfg_dict,
+            ptq_tokenizer=self.model_config.get_processor(),
         )
         self.tf_config = updated_tf_config
         print(f"module: {len(module)}")
@@ -213,6 +224,13 @@ class MegatronEngine(BaseEngine):
         else:
             if self.vanilla_bridge:
                 self.bridge.load_weights(module, self.model_config.local_path)
+            elif not quant_cfg_dict.get("enabled", False):
+                allowed_mismatched_params = []
+                if self.is_value_model:
+                    allowed_mismatched_params = ["output_layer.weight"]
+                self.bridge.load_hf_weights(
+                    module, self.model_config.local_path, allowed_mismatched_params=allowed_mismatched_params
+                )
             else:
                 allowed_mismatched_params = []
                 if self.is_value_model:
