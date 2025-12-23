@@ -354,7 +354,7 @@ class vLLMHttpServerBase:
         if self.config.enable_rollout_routing_replay:
             args.update({"enable_return_routed_experts": True})
 
-        server_args = ["serve", self.model_config.local_path]
+        server_args = ["serve", "Qwen/Qwen3-8B-AWQ"]  # TODO: pass the quantized model path
         for k, v in args.items():
             if isinstance(v, bool):
                 if v:

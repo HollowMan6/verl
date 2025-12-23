@@ -197,7 +197,7 @@ class RolloutConfig(BaseConfig):
 
     enable_prefix_caching: bool = True
 
-    load_format: str = "dummy"
+    load_format: str = "safetensors"
 
     layered_summon: bool = False
 

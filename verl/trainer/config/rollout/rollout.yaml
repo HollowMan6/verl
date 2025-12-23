@@ -75,7 +75,7 @@ enable_prefix_caching: True
 
 # Which loader to use for rollout model weights: dummy, hf, megatron, etc.
 # safetensors (for huge model, and set use_shm=True); dummy: randomly init model weight
-load_format: dummy
+load_format: safetensors
 
 # [Will be deprecated, use log_prob_micro_batch_size_per_gpu] The batch size for one forward pass in the computation of log_prob. Global batch size.
 log_prob_micro_batch_size: null
