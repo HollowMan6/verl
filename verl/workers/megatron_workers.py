@@ -113,6 +113,7 @@ class MegatronWorker(Worker):
         override_transformer_config,
         trust_remote_code=False,
         megatron_config=None,
+        load_weights: bool = True,
     ):
         from transformers import AutoConfig
 
@@ -178,10 +179,14 @@ class MegatronWorker(Worker):
             else:
                 from verl.models.mcore.bridge import AutoBridge
 
+                quant_cfg = megatron_config.get("modelopt_quantization", {})
+                if not quant_cfg.get("enabled", False):
+                    load_weights = False
+
                 # Use Megatron-Bridge to convert HF config to Megatron config
                 bridge = AutoBridge.from_hf_pretrained(self.local_path, trust_remote_code=trust_remote_code)
                 # Get Megatron provider and configure it
-                provider = bridge.to_megatron_provider(load_weights=False)
+                provider = bridge.to_megatron_provider(load_weights=load_weights)
 
                 # In case of invalid overrides, we need to make sure some critical params are set correctly
                 provider.params_dtype = dtype
@@ -206,6 +211,12 @@ class MegatronWorker(Worker):
                 # Apply transformer config overrides
                 for key, value in override_transformer_config.items():
                     setattr(provider, key, value)
+                if quant_cfg.get("enabled", False):
+                    provider.restore_modelopt_state = True
+                    # Quantization layer spec uses SequentialMLP which is incompatible with MoE permute fusion
+                    provider.moe_permute_fusion = False
+                    if megatron_config.use_remove_padding:
+                        provider.use_arbitrary_attention_mask = False
 
                 provider.finalize()
                 self.provider = provider
@@ -377,6 +388,7 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
             override_transformer_config,
             self.config.model.get("trust_remote_code", False),
             self.config.actor.megatron if not self._is_ref else self.config.ref.megatron,
+            load_weights=(self.config.actor.load_weight if not self._is_ref else self.config.ref.load_weight),
         )
         self.generation_config = get_generation_config(
             self.local_path,
@@ -384,6 +396,8 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
         )
 
         if self._is_actor or self._is_rollout:
+            quant_cfg_dict = self.config.actor.megatron.get("modelopt_quantization", {})
+
             wrap_config = McoreModuleWrapperConfig(
                 is_value_model=False,  # actor is not value model
                 share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
@@ -400,6 +414,8 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
                 override_ddp_config=override_ddp_config,
                 peft_cls=self.peft_cls,
                 peft_config=self.config.model.get("lora", None),
+                modelopt_quantization=quant_cfg_dict,
+                ptq_tokenizer=(self.processor if self.processor is not None else self.tokenizer),
             )
             self.tf_config = updated_tf_config
             print(f"actor_module: {len(actor_module)}")
@@ -416,7 +432,7 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
                         local_model_path = get_hf_model_path(self.config)
                         if self.vanilla_bridge:
                             self.bridge.load_weights(actor_module, local_model_path)
-                        else:
+                        elif not quant_cfg_dict.get("enabled", False):
                             self.bridge.load_hf_weights(actor_module, local_model_path)
                     else:
                         load_megatron_gptmodel_weights(
@@ -427,6 +443,7 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
                 print_model_size(actor_module[0])
             log_gpu_memory_usage("After MegatronPPOActor init", logger=logger)
         elif self._is_ref:
+            quant_cfg_dict = self.config.ref.megatron.get("modelopt_quantization", {})
             wrap_config = McoreModuleWrapperConfig(
                 is_value_model=False,  # ref is not value model
                 share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
@@ -440,6 +457,8 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
                 bridge=self.bridge,
                 provider=self.provider,
                 override_model_config=override_model_config,
+                modelopt_quantization=quant_cfg_dict,
+                ptq_tokenizer=(self.processor if self.processor is not None else self.tokenizer),
             )
             self.tf_config = updated_tf_config
             if self.config.ref.load_weight:  # should align with the actor:
@@ -457,7 +476,7 @@ class ActorRolloutRefWorker(MegatronWorker, DistProfilerExtension):
                         local_model_path = get_hf_model_path(self.config)
                         if self.vanilla_bridge:
                             self.bridge.load_weights(ref_module, local_model_path)
-                        else:
+                        elif not quant_cfg_dict.get("enabled", False):
                             self.bridge.load_hf_weights(ref_module, local_model_path)
                     else:
                         load_megatron_gptmodel_weights(
@@ -1098,7 +1117,10 @@ class CriticWorker(MegatronWorker, DistProfilerExtension):
             override_transformer_config,
             self.config.model.get("trust_remote_code", False),
             self.config.megatron,
+            load_weights=self.config.load_weight,
         )
+
+        quant_cfg_dict = self.config.megatron.get("modelopt_quantization", {})
 
         wrap_config = McoreModuleWrapperConfig(
             is_value_model=True,  # critic is value model
@@ -1116,6 +1138,8 @@ class CriticWorker(MegatronWorker, DistProfilerExtension):
             override_ddp_config=override_ddp_config,
             peft_cls=self.peft_cls,
             peft_config=self.config.model.get("lora", None),
+            modelopt_quantization=quant_cfg_dict,
+            ptq_tokenizer=(self.processor if self.processor is not None else self.tokenizer),
         )
         self.tf_config = updated_tf_config
         # note that here critic_module will be a list to be compatible with the construction of interleaved pp (vpp).
@@ -1136,7 +1160,7 @@ class CriticWorker(MegatronWorker, DistProfilerExtension):
                     local_model_path = get_hf_model_path(self.config)
                     if self.vanilla_bridge:
                         self.bridge.load_weights(critic_module, local_model_path)
-                    else:
+                    elif not quant_cfg_dict.get("enabled", False):
                         self.bridge.load_hf_weights(
                             critic_module, local_model_path, allowed_mismatched_params=["output_layer.weight"]
                         )
@@ -1384,7 +1408,10 @@ class RewardModelWorker(MegatronWorker, DistProfilerExtension):
             override_transformer_config,
             self.config.model.get("trust_remote_code", False),
             self.config.megatron,
+            load_weights=self.config.load_weight,
         )
+
+        quant_cfg_dict = self.config.megatron.get("modelopt_quantization", {})
 
         wrap_config = McoreModuleWrapperConfig(
             is_value_model=True,  # reward model is value model
@@ -1399,6 +1426,8 @@ class RewardModelWorker(MegatronWorker, DistProfilerExtension):
             bridge=self.bridge,
             provider=self.provider,
             override_model_config=override_model_config,
+            modelopt_quantization=quant_cfg_dict,
+            ptq_tokenizer=(self.processor if self.processor is not None else self.tokenizer),
         )
         self.tf_config = updated_tf_config
 
@@ -1415,7 +1444,7 @@ class RewardModelWorker(MegatronWorker, DistProfilerExtension):
                     local_model_path = get_hf_model_path(self.config)
                     if self.vanilla_bridge:
                         self.bridge.load_weights(reward_model, local_model_path)
-                    else:
+                    elif not quant_cfg_dict.get("enabled", False):
                         self.bridge.load_hf_weights(
                             reward_model, local_model_path, allowed_mismatched_params=["output_layer.weight"]
                         )
