@@ -205,7 +205,7 @@ class vLLMAsyncRollout(BaseRollout):
         )
         self.vllm_config = all_kwargs[0]["vllm_config"]
         if self.lora_config:
-            lora_dtype = getattr(torch, self.config.dtype)
+            lora_dtype = torch.bfloat16
             self.vllm_config.lora_config = LoRAConfig(lora_dtype=lora_dtype, **self.lora_config)
         if self.config.quantization is not None:
             _SUPPORTED_QUANTIZATION = ["fp8", "torchao"]

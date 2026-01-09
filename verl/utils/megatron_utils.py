@@ -41,6 +41,8 @@ from verl.utils.fs import local_mkdir_safe
 from verl.utils.model import normalize_model_name
 from verl.utils.torch_dtypes import PrecisionType
 
+# from functools import partial
+
 
 def get_model_config(model):
     return get_attr_wrapped_model(model, "config", allow_none=False)
@@ -235,6 +237,22 @@ def make_megatron_module(
                         force_all_expert_routing=qcfg.force_all_expert_routing,
                     )
                 provider.register_pre_wrap_hook(apply_modelopt_quantization_with_config(qcfg, ptq_loop))
+
+                # from megatron.core.post_training.modelopt.gpt.state_dict_hooks import (
+                #     mcore_gpt_load_te_state_dict_pre_hook,
+                # )
+                # provider.register_pre_wrap_hook(
+                #     partial(
+                #         mcore_gpt_load_te_state_dict_pre_hook,
+                #         prefix=None,
+                #         local_metadata=None,
+                #         strict=None,
+                #         missing_keys=None,
+                #         unexpected_keys=None,
+                #         error_msgs=None,
+                #     ),
+                #     prepend=True,
+                # )
 
             # When using PEFT with Megatron-Bridge, we must apply PEFT transformation
             # BEFORE wrapping the model in DDP. This is required because:
