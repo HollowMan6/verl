@@ -74,6 +74,21 @@ override_transformer_config:
 
 override_mcore_model_config: {}
 
+# Optional: enable NVIDIA ModelOpt quantization for Megatron training.
+# NOTE: Requires `modelopt` to be installed.
+modelopt_quantization:
+  enabled: false
+  quant_cfg: int4_awq          # one of: int8_sq, fp8, fp8_blockwise, int4_awq, w4a8_awq, nvfp4
+  weight_only: true            # set true to avoid PTQ calibration
+  compress: true               # real low-bit compression
+  export_kv_cache_quant: false
+  force_all_expert_routing: false
+
+  # If weight_only=false, you must provide PTQ prompts ("|"-separated)
+  ptq_prompts: null # "Hello!|Explain PPO in one paragraph."
+  ptq_osl: 1
+  calib_size: 512
+
 # oc.select: default val for ref.megatron.use_mbridge
 use_mbridge: True
 

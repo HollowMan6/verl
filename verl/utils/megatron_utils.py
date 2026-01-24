@@ -180,6 +180,8 @@ def make_megatron_module(
     override_ddp_config: dict[str, Any] = None,
     peft_cls: Any = None,
     peft_config: Any = None,
+    modelopt_quantization: dict[str, Any] | None = None,
+    ptq_tokenizer: Any = None,
 ):
     if override_model_config is None:
         override_model_config = {}
@@ -203,6 +205,37 @@ def make_megatron_module(
         if override_model_config.get("moe_config", {}).get("freeze_moe_router", False):
             post_model_creation_callbacks.append(freeze_moe_router)
         if provider is not None:
+            # Quantization must happen AFTER weights are loaded and AFTER the model is on GPU,
+            # but BEFORE DDP wrapping and BEFORE PEFT (so adapters are not quantized).
+            quant_cfg = modelopt_quantization or {}
+            quant_enabled = quant_cfg.get("enabled", False)
+
+            if quant_enabled:
+                # Apply ModelOpt quantization on base model
+                from verl.utils.modelopt_quantization import (
+                    ModelOptQuantizationConfig,
+                    apply_modelopt_quantization_with_config,
+                    build_prompt_ptq_forward_loop,
+                )
+
+                qcfg = ModelOptQuantizationConfig(**quant_cfg)
+
+                ptq_loop = None
+                if not qcfg.weight_only:
+                    if not qcfg.ptq_prompts:
+                        raise ValueError(
+                            "ModelOpt PTQ quantization is enabled but no PTQ prompts were provided. "
+                            "Set modelopt_quantization.weight_only=true, or set modelopt_quantization.ptq_prompts."
+                        )
+                    ptq_loop = build_prompt_ptq_forward_loop(
+                        tokenizer=ptq_tokenizer,
+                        prompts=qcfg.ptq_prompts,
+                        calib_size=qcfg.calib_size,
+                        osl=qcfg.ptq_osl,
+                        force_all_expert_routing=qcfg.force_all_expert_routing,
+                    )
+                provider.register_pre_wrap_hook(apply_modelopt_quantization_with_config(qcfg, ptq_loop))
+
             # When using PEFT with Megatron-Bridge, we must apply PEFT transformation
             # BEFORE wrapping the model in DDP. This is required because:
             # 1. PEFT freezes base model parameters (requires_grad=False)

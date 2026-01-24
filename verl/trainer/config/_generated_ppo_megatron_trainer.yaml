@@ -52,6 +52,16 @@ actor_rollout_ref:
         recompute_num_layers: null
         attention_backend: flash
       override_mcore_model_config: {}
+      modelopt_quantization:
+        enabled: false
+        quant_cfg: int4_awq
+        weight_only: true
+        compress: true
+        export_kv_cache_quant: false
+        force_all_expert_routing: false
+        ptq_prompts: null
+        ptq_osl: 1
+        calib_size: 512
       use_mbridge: true
       vanilla_mbridge: true
       use_remove_padding: true
@@ -190,6 +200,16 @@ actor_rollout_ref:
       override_ddp_config: {}
       override_transformer_config: ${oc.select:actor_rollout_ref.actor.megatron.override_transformer_config,{}}
       override_mcore_model_config: {}
+      modelopt_quantization:
+        enabled: false
+        quant_cfg: int4_awq
+        weight_only: true
+        compress: true
+        export_kv_cache_quant: false
+        force_all_expert_routing: false
+        ptq_prompts: null
+        ptq_osl: 1
+        calib_size: 512
       use_mbridge: ${oc.select:actor_rollout_ref.actor.megatron.use_mbridge,False}
       vanilla_mbridge: ${oc.select:actor_rollout_ref.actor.megatron.vanilla_mbridge,True}
       use_remove_padding: ${oc.select:actor_rollout_ref.actor.megatron.use_remove_padding,True}
@@ -458,6 +478,16 @@ critic:
       recompute_num_layers: null
       attention_backend: flash
     override_mcore_model_config: {}
+    modelopt_quantization:
+      enabled: false
+      quant_cfg: int4_awq
+      weight_only: true
+      compress: true
+      export_kv_cache_quant: false
+      force_all_expert_routing: false
+      ptq_prompts: null
+      ptq_osl: 1
+      calib_size: 512
     use_mbridge: true
     vanilla_mbridge: true
     use_remove_padding: true
