@@ -1350,17 +1350,20 @@ def check_mtp_config(model_config: HFModelConfig, engine_config: McoreEngineConf
         - mtp.enable == True and has MTP layers: configure override_transformer_config
         - mtp.enable == True and no MTP layers: raise ValueError
     """
+    text_hf_config = getattr(model_config.hf_config, "text_config", model_config.hf_config)
     has_mtp = (
-        model_config.hf_config.num_nextn_predict_layers > 0
-        if hasattr(model_config.hf_config, "num_nextn_predict_layers")
-        else False
+        getattr(text_hf_config, "num_nextn_predict_layers", 0) > 0
+        or getattr(text_hf_config, "mtp_num_hidden_layers", 0) > 0
     )
     enable_mtp = model_config.mtp.enable
 
     if not enable_mtp and not has_mtp:
         return
     elif not enable_mtp and has_mtp:
-        model_config.hf_config.num_nextn_predict_layers = 0
+        if hasattr(text_hf_config, "num_nextn_predict_layers"):
+            text_hf_config.num_nextn_predict_layers = 0
+        elif hasattr(text_hf_config, "mtp_num_hidden_layers"):
+            text_hf_config.mtp_num_hidden_layers = 0
     elif enable_mtp and not has_mtp:
         raise ValueError("enable mtp while model has no mtp layer, please use a model with mtp layer")
     elif enable_mtp and has_mtp:
