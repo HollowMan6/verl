@@ -156,3 +156,51 @@ def test_update_weights_from_ipc_accumulates_lora_tensors_across_buckets(monkeyp
         "layers.0.self_attn.q_proj.lora_A.weight",
         "layers.0.self_attn.q_proj.lora_B.weight",
     }
+
+
+def test_update_weights_from_ipc_clones_lora_tensors_across_reused_buckets(monkeypatch):
+    import verl.workers.rollout.vllm_rollout.bucketed_weight_transfer as bucketed_weight_transfer
+
+    class _FakeBucketReceiver:
+        def __init__(self, zmq_handle, device, use_shm):
+            del zmq_handle, device, use_shm
+
+        def receive_weights(self, on_bucket_received):
+            shared_tensor = torch.empty(1)
+
+            shared_tensor.fill_(1.0)
+            on_bucket_received(
+                [("layers.0.self_attn.q_proj.lora_A.weight", shared_tensor)],
+                is_last=False,
+            )
+
+            shared_tensor.fill_(2.0)
+            on_bucket_received(
+                [("layers.0.self_attn.q_proj.lora_B.weight", shared_tensor)],
+                is_last=True,
+            )
+
+    monkeypatch.setattr(bucketed_weight_transfer, "BucketedWeightReceiver", _FakeBucketReceiver)
+
+    worker = _make_worker(_FakeModel())
+    worker.model_runner.vllm_config = SimpleNamespace()
+    worker.device = torch.device("cpu")
+    worker.local_rank = 0
+    worker._is_qat_model = False
+    worker._get_zmq_handle = lambda: "ipc:///tmp/test-bucketed-lora-clone.sock"
+    worker.remove_lora = lambda *_args, **_kwargs: None
+
+    added_requests = []
+
+    def _add_lora(lora_request):
+        added_requests.append(lora_request)
+        return True
+
+    worker.add_lora = _add_lora
+
+    worker.update_weights_from_ipc(peft_config={"r": 1}, base_sync_done=True)
+
+    assert len(added_requests) == 1
+    lora_tensors = added_requests[0].lora_tensors
+    torch.testing.assert_close(lora_tensors["layers.0.self_attn.q_proj.lora_A.weight"], torch.tensor([1.0]))
+    torch.testing.assert_close(lora_tensors["layers.0.self_attn.q_proj.lora_B.weight"], torch.tensor([2.0]))

@@ -367,8 +367,11 @@ class vLLMColocateWorkerExtension:
         ) -> None:
             # vLLM add_lora consumes one complete adapter tensor dict, so only
             # the LoRA sync path needs to accumulate tensors across buckets.
+            # Clone here because BucketedWeightReceiver exposes tensor views into
+            # a reusable transfer buffer; without detaching them, later buckets
+            # can overwrite tensors cached from earlier buckets before add_lora.
             if lora_weights is not None:
-                lora_weights.update(weights)
+                lora_weights.update((name, tensor.detach().clone()) for name, tensor in weights)
                 if is_last:
                     self._update_weights(
                         list(lora_weights.items()),
