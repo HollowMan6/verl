@@ -306,87 +306,90 @@ class vLLMColocateWorkerExtension:
 
     def update_weights_from_ipc(self, peft_config: dict = None, base_sync_done=False, use_shm: bool = False):
         """Update the weights of the rollout model."""
+        from vllm.config import set_current_vllm_config
         from vllm.platforms import current_platform
 
         from verl.workers.rollout.vllm_rollout.bucketed_weight_transfer import BucketedWeightReceiver
 
-        if current_platform.device_type == "npu" and self.device is None:
-            self.device = torch.device(f"npu:{self.local_rank}")
+        with set_current_vllm_config(self.model_runner.vllm_config):
+            if current_platform.device_type == "npu" and self.device is None:
+                self.device = torch.device(f"npu:{self.local_rank}")
 
-        # In async mode, make sure the old lora is removed before adding the new one
-        if peft_config and base_sync_done:
-            self.remove_lora(VLLM_LORA_INT_ID)
+            # In async mode, make sure the old lora is removed before adding the new one
+            if peft_config and base_sync_done:
+                self.remove_lora(VLLM_LORA_INT_ID)
 
-        use_standard_weight_load = not (peft_config and base_sync_done) and not is_fp8_model(
-            self.model_runner.vllm_config
-        )
-
-        if self._is_qat_model:
-            # QAT (compressed-tensors): Prepare for weight loading BEFORE receiving any buckets
-            from verl.utils.qat import prepare_qat_for_load_weights
-
-            prepare_qat_for_load_weights(self.model_runner.model, device=self.device)
-            logger.info("QAT: prepare_qat_for_load_weights completed")
-        elif self._is_modelopt_qat:
-            from verl.utils.modelopt.vllm_modelopt_patch import prepare_modelopt_for_weight_reload
-
-            prepare_modelopt_for_weight_reload(self.model_runner.model, device=self.device)
-            logger.info("ModelOpt: prepare_modelopt_for_weight_reload completed")
-        elif use_standard_weight_load:
-            # Re-apply here because async IPC weight sync can happen long after init and lose MoE weight_loader attrs.
-            patch_vllm_moe_model_weight_loader(self.model_runner.model)
-
-        assert self.device is not None
-        receiver = BucketedWeightReceiver(
-            zmq_handle=self._get_zmq_handle(),
-            device=self.device,
-            use_shm=use_shm,
-        )
-        lora_weights: dict[str, torch.Tensor] | None = {} if peft_config and base_sync_done else None
-
-        def on_bucket_received(
-            weights: list[tuple[str, torch.Tensor]],
-            *,
-            is_last: bool,
-        ) -> None:
-            # vLLM add_lora consumes one complete adapter tensor dict, so only
-            # the LoRA sync path needs to accumulate tensors across buckets.
-            if lora_weights is not None:
-                lora_weights.update(weights)
-                if is_last:
-                    self._update_weights(
-                        list(lora_weights.items()),
-                        peft_config=peft_config,
-                        base_sync_done=base_sync_done,
-                    )
-                return
-
-            self._update_weights(
-                weights,
-                peft_config=peft_config,
-                base_sync_done=base_sync_done,
+            use_standard_weight_load = not (peft_config and base_sync_done) and not is_fp8_model(
+                self.model_runner.vllm_config
             )
 
-        receiver.receive_weights(on_bucket_received=on_bucket_received)
+            if self._is_qat_model:
+                # QAT (compressed-tensors): Prepare for weight loading BEFORE receiving any buckets
+                from verl.utils.qat import prepare_qat_for_load_weights
 
-        if self._is_qat_model:
-            # QAT (compressed-tensors): call process_weights_after_loading AFTER all buckets are received
-            from verl.utils.qat import manual_process_weights_after_loading
+                prepare_qat_for_load_weights(self.model_runner.model, device=self.device)
+                logger.info("QAT: prepare_qat_for_load_weights completed")
+            elif self._is_modelopt_qat:
+                from verl.utils.modelopt.vllm_modelopt_patch import prepare_modelopt_for_weight_reload
 
-            manual_process_weights_after_loading(self.model_runner.model)
-            logger.info("QAT: process_weights_after_loading completed")
-        elif self._is_modelopt_qat:
-            from verl.utils.modelopt.vllm_modelopt_patch import modelopt_process_weights_after_loading
+                prepare_modelopt_for_weight_reload(self.model_runner.model, device=self.device)
+                logger.info("ModelOpt: prepare_modelopt_for_weight_reload completed")
+            elif use_standard_weight_load:
+                # Re-apply here because async IPC weight sync
+                # can happen long after init and lose MoE weight_loader attrs.
+                patch_vllm_moe_model_weight_loader(self.model_runner.model)
 
-            modelopt_process_weights_after_loading(self.model_runner.model)
-            logger.info("ModelOpt QAT: process_weights_after_loading completed")
-        elif use_standard_weight_load:
-            # Some post-load transforms are non-idempotent; run once after all buckets.
-            from vllm.model_executor.model_loader.utils import process_weights_after_loading
+            assert self.device is not None
+            receiver = BucketedWeightReceiver(
+                zmq_handle=self._get_zmq_handle(),
+                device=self.device,
+                use_shm=use_shm,
+            )
+            lora_weights: dict[str, torch.Tensor] | None = {} if peft_config and base_sync_done else None
 
-            model = self.model_runner.model
-            model_config = self.model_runner.vllm_config.model_config
-            process_weights_after_loading(model, model_config, self.device)
+            def on_bucket_received(
+                weights: list[tuple[str, torch.Tensor]],
+                *,
+                is_last: bool,
+            ) -> None:
+                # vLLM add_lora consumes one complete adapter tensor dict, so only
+                # the LoRA sync path needs to accumulate tensors across buckets.
+                if lora_weights is not None:
+                    lora_weights.update(weights)
+                    if is_last:
+                        self._update_weights(
+                            list(lora_weights.items()),
+                            peft_config=peft_config,
+                            base_sync_done=base_sync_done,
+                        )
+                    return
+
+                self._update_weights(
+                    weights,
+                    peft_config=peft_config,
+                    base_sync_done=base_sync_done,
+                )
+
+            receiver.receive_weights(on_bucket_received=on_bucket_received)
+
+            if self._is_qat_model:
+                # QAT (compressed-tensors): call process_weights_after_loading AFTER all buckets are received
+                from verl.utils.qat import manual_process_weights_after_loading
+
+                manual_process_weights_after_loading(self.model_runner.model)
+                logger.info("QAT: process_weights_after_loading completed")
+            elif self._is_modelopt_qat:
+                from verl.utils.modelopt.vllm_modelopt_patch import modelopt_process_weights_after_loading
+
+                modelopt_process_weights_after_loading(self.model_runner.model)
+                logger.info("ModelOpt QAT: process_weights_after_loading completed")
+            elif use_standard_weight_load:
+                # Some post-load transforms are non-idempotent; run once after all buckets.
+                from vllm.model_executor.model_loader.utils import process_weights_after_loading
+
+                model = self.model_runner.model
+                model_config = self.model_runner.vllm_config.model_config
+                process_weights_after_loading(model, model_config, self.device)
 
     def _update_weights(self, weights: list[tuple[str, torch.Tensor]], peft_config: dict, base_sync_done: bool):
         if peft_config and base_sync_done:
