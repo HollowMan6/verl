@@ -431,7 +431,8 @@ class vLLMColocateWorkerExtension:
                 prepare_modelopt_for_weight_reload(self.model_runner.model, device=self.device)
                 logger.info("ModelOpt: prepare_modelopt_for_weight_reload completed")
             elif use_standard_weight_load:
-                # Re-apply here because async IPC weight sync can happen long after init and lose MoE weight_loader attrs.
+                # Re-apply here because async IPC weight sync can happen
+                # long after init and lose MoE weight_loader attrs.
                 for model in self._iter_all_models():
                     patch_vllm_moe_model_weight_loader(model)
 
