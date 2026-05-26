@@ -222,8 +222,9 @@ class MegatronEngine(BaseEngine):
                 provider_overrides[key] = value
             if not self.model_config.mtp.enable:
                 provider_overrides["mtp_num_layers"] = 0
-                if provider.csa_compress_ratios is not None:
-                    provider_overrides["csa_compress_ratios"] = provider.csa_compress_ratios[: provider.num_layers]
+                csa_compress_ratios = getattr(provider, "csa_compress_ratios", None)
+                if csa_compress_ratios is not None:
+                    provider_overrides["csa_compress_ratios"] = csa_compress_ratios[: provider.num_layers]
             if self.enable_routing_replay:
                 if hasattr(provider, "moe_enable_routing_replay"):
                     provider_overrides["moe_enable_routing_replay"] = True

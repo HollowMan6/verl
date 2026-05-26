@@ -874,6 +874,8 @@ class vLLMHttpServer:
                 if hasattr(hf_config, field):
                     hf_overrides[field] = 0
         rope_scaling = getattr(hf_config, "rope_scaling", None)
+        if rope_scaling is not None and hasattr(rope_scaling, "to_dict"):
+            rope_scaling = rope_scaling.to_dict()
         if isinstance(rope_scaling, dict):
             rope_type = rope_scaling.get("rope_type") or rope_scaling.get("type")
             if rope_type == "yarn":
@@ -881,7 +883,7 @@ class vLLMHttpServer:
                 rope_scaling_override["rope_type"] = rope_type
                 rope_scaling_override["type"] = rope_type
                 for key in ("factor", "beta_fast", "beta_slow"):
-                    if key in rope_scaling_override:
+                    if rope_scaling_override.get(key) is not None:
                         rope_scaling_override[key] = float(rope_scaling_override[key])
                 hf_overrides["rope_scaling"] = rope_scaling_override
 

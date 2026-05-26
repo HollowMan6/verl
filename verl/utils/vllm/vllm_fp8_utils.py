@@ -58,7 +58,10 @@ def _copy_param_attributes(dst_param, src_param):
     base_param_dir = dir(torch.nn.Parameter)
     for attr in dir(src_param):
         if attr not in base_param_dir and not attr.startswith("__"):
-            setattr(dst_param, attr, getattr(src_param, attr))
+            try:
+                setattr(dst_param, attr, getattr(src_param, attr))
+            except Exception:
+                pass
 
 
 def _create_param_from_subclass_attributes(custom_param, source_param=None):
@@ -435,7 +438,7 @@ def get_module_from_param_name(model, name: str):
 
         return candidates
 
-    packed_modules_mapping = getattr(model, "packed_modules_mapping", {})
+    packed_modules_mapping = getattr(model, "packed_modules_mapping", None) or {}
     reversed_mapping = {
         original_name: fused_name
         for fused_name, original_names_list in packed_modules_mapping.items()
@@ -505,6 +508,9 @@ def _is_prequantized_fp8_tensor(tensor):
 
 
 def _model_type(model):
+    if model is None:
+        return None
+
     for obj in (model, getattr(model, "config", None), getattr(model, "hf_config", None)):
         if obj is None:
             continue
@@ -512,8 +518,11 @@ def _model_type(model):
         if model_type is not None:
             return model_type
     config = getattr(model, "config", None)
-    text_config = getattr(config, "text_config", None)
-    return getattr(text_config, "model_type", None)
+    if config is not None:
+        text_config = getattr(config, "text_config", None)
+        if text_config is not None:
+            return getattr(text_config, "model_type", None)
+    return None
 
 
 def _uses_dot_scale_suffix(model):

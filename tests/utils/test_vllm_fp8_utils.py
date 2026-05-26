@@ -92,6 +92,20 @@ def test_deepseek_v4_scale_name_uses_sibling_scale_suffix():
     )
 
 
+def test_model_type_handles_missing_model_and_config():
+    vllm_fp8_utils = _import_vllm_fp8_utils()
+
+    class ModelWithoutConfig:
+        pass
+
+    class ModelWithEmptyConfig:
+        config = None
+
+    assert vllm_fp8_utils._model_type(None) is None
+    assert vllm_fp8_utils._model_type(ModelWithoutConfig()) is None
+    assert vllm_fp8_utils._model_type(ModelWithEmptyConfig()) is None
+
+
 def test_forced_scale_name_keeps_mxfp4_suffix_for_other_models():
     vllm_fp8_utils = _import_vllm_fp8_utils()
 

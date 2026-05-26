@@ -263,15 +263,14 @@ class vLLMColocateWorkerExtension:
                 patch_vllm_moe_model_weight_loader(model)
 
         assert self.device is not None
-        quant_reload_states = None
+        quant_reload_state = None
+        drafter_quant_reload_state = None
         if is_fp8_model(self.model_runner.vllm_config) and not (peft_config and base_sync_done):
             from verl.utils.vllm.vllm_fp8_utils import prepare_quanted_weights_for_loading
 
-            quant_reload_states = {"main": prepare_quanted_weights_for_loading(self.model_runner)}
+            quant_reload_state = prepare_quanted_weights_for_loading(self.model_runner)
             if self._use_mtp_drafter_weight_sync():
-                quant_reload_states["drafter"] = prepare_quanted_weights_for_loading(
-                    self.model_runner, is_drafter=True
-                )
+                drafter_quant_reload_state = prepare_quanted_weights_for_loading(self.model_runner, is_drafter=True)
 
         receiver = BucketedWeightReceiver(
             zmq_handle=self._get_zmq_handle(),
@@ -283,7 +282,7 @@ class vLLMColocateWorkerExtension:
                 weights,
                 peft_config=peft_config,
                 base_sync_done=base_sync_done,
-                quant_prepared=quant_reload_states is not None,
+                quant_prepared=quant_reload_state is not None,
             )
         )
 
@@ -299,14 +298,15 @@ class vLLMColocateWorkerExtension:
 
             modelopt_process_weights_after_loading(self.model_runner.model)
             logger.info("ModelOpt QAT: process_weights_after_loading completed")
-        elif quant_reload_states is not None:
+        elif quant_reload_state is not None:
             from verl.utils.vllm.vllm_fp8_utils import process_quanted_weights_after_loading
 
-            process_quanted_weights_after_loading(self.model_runner, quant_reload_states["main"])
-            drafter_reload_state = quant_reload_states.get("drafter")
-            if drafter_reload_state is not None:
+            process_quanted_weights_after_loading(self.model_runner, quant_reload_state)
+            if drafter_quant_reload_state is not None:
                 process_quanted_weights_after_loading(
-                    self.model_runner, drafter_reload_state, is_drafter=True
+                    self.model_runner,
+                    drafter_quant_reload_state,
+                    is_drafter=True,
                 )
             logger.info("FP8/MXFP4: process_weights_after_loading completed")
         elif use_standard_weight_load:
@@ -353,25 +353,13 @@ class vLLMColocateWorkerExtension:
             if is_fp8_model(self.model_runner.vllm_config):
                 logger.info(f"FP8 model detected (async): {self.model_runner.vllm_config.quant_config}")
                 # Convert bf16 weights to fp8 format before loading
+                reload_kwargs = {"prepare_model": not quant_prepared, "process_model": not quant_prepared}
                 loaded_params = (
-                    load_quanted_weights(
-                        param_updates,
-                        self.model_runner,
-                        prepare_model=not quant_prepared,
-                        process_model=not quant_prepared,
-                    )
-                    if param_updates
-                    else []
+                    load_quanted_weights(param_updates, self.model_runner, **reload_kwargs) if param_updates else []
                 )
                 # Keep the draft model in sync when present.
                 if self._use_mtp_drafter_weight_sync() and param_updates:
-                    load_quanted_weights(
-                        param_updates,
-                        self.model_runner,
-                        is_drafter=True,
-                        prepare_model=not quant_prepared,
-                        process_model=not quant_prepared,
-                    )
+                    load_quanted_weights(param_updates, self.model_runner, is_drafter=True, **reload_kwargs)
                 loaded_buffers = self._apply_buffer_updates_all_models(buffer_updates, named_buffers)
                 logger.info(
                     f"FP8 weights loaded (async), loaded_params: {len(loaded_params)}, loaded_buffers: {loaded_buffers}"
