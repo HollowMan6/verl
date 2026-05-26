@@ -134,7 +134,7 @@ def test_update_weights_from_ipc_accumulates_lora_tensors_across_buckets(monkeyp
     monkeypatch.setattr(bucketed_weight_transfer, "BucketedWeightReceiver", _FakeBucketReceiver)
 
     worker = _make_worker(_FakeModel())
-    worker.model_runner.vllm_config = SimpleNamespace()
+    worker.model_runner.vllm_config = SimpleNamespace(speculative_config=None)
     worker.device = torch.device("cpu")
     worker.local_rank = 0
     worker._is_qat_model = False
@@ -186,7 +186,7 @@ def test_update_weights_from_ipc_uses_reload_weights_stream_for_standard_base_sy
     monkeypatch.setattr(worker_utils, "patch_vllm_moe_model_weight_loader", lambda model: None)
 
     worker = _make_worker(_FakeModel())
-    worker.model_runner.vllm_config = SimpleNamespace()
+    worker.model_runner.vllm_config = SimpleNamespace(speculative_config=None)
     worker.device = torch.device("cpu")
     worker.local_rank = 0
     worker._is_qat_model = False
