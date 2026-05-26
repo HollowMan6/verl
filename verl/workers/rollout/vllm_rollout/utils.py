@@ -458,7 +458,7 @@ class vLLMColocateWorkerExtension:
                     # vLLM add_lora consumes one complete adapter tensor dict, so only
                     # the LoRA sync path needs to accumulate tensors across buckets.
                     if lora_weights is not None:
-                        lora_weights.update(weights)
+                        lora_weights.update((name, tensor.clone()) for name, tensor in weights)
                         if is_last:
                             self._update_weights(
                                 list(lora_weights.items()),
