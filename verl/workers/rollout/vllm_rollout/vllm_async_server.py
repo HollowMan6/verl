@@ -868,6 +868,22 @@ class vLLMHttpServer:
         """Process quantization config. Returns (quantization_str, hf_overrides)."""
         quantization = self.config.quantization
         hf_overrides = {}
+        hf_config = self.model_config.hf_config
+        if not self.model_config.mtp.enable:
+            for field in ("num_nextn_predict_layers", "mtp_num_hidden_layers"):
+                if hasattr(hf_config, field):
+                    hf_overrides[field] = 0
+        rope_scaling = getattr(hf_config, "rope_scaling", None)
+        if isinstance(rope_scaling, dict):
+            rope_type = rope_scaling.get("rope_type") or rope_scaling.get("type")
+            if rope_type == "yarn":
+                rope_scaling_override = dict(rope_scaling)
+                rope_scaling_override["rope_type"] = rope_type
+                rope_scaling_override["type"] = rope_type
+                for key in ("factor", "beta_fast", "beta_slow"):
+                    if key in rope_scaling_override:
+                        rope_scaling_override[key] = float(rope_scaling_override[key])
+                hf_overrides["rope_scaling"] = rope_scaling_override
 
         if is_torch_npu_available(check_device=False):
             from verl.utils.vllm.npu_vllm_patch import check_vllm_ascend_before_server_launch

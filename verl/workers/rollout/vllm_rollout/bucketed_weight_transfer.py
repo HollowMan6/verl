@@ -41,6 +41,11 @@ class TensorMetadata(TypedDict):
     handle: tuple
 
 
+def _align_offset(offset: int, alignment: int) -> int:
+    alignment = max(alignment, 1)
+    return ((offset + alignment - 1) // alignment) * alignment
+
+
 # copy from https://github.com/vllm-project/vllm/blob/main/examples/offline_inference/rlhf_utils.py
 def rebuild_ipc(handle: tuple[Callable, tuple], device_id: int | None = None) -> torch.Tensor:
     func, args = handle
@@ -125,15 +130,20 @@ class BucketedWeightSender:
                 # transfer volume.
                 # weight = weight.to(dtype, non_blocking=True)
 
+                weight_nbytes = weight.nbytes
+                alignment = max(weight.element_size(), 1)
+                aligned_offset = _align_offset(offset, alignment)
+
                 # fill the tensor bucket
-                if offset + weight.nbytes > self.bucket_size and len(bucket_meta) > 0:
+                if aligned_offset + weight_nbytes > self.bucket_size and len(bucket_meta) > 0:
                     get_torch_device().synchronize()
                     self.socket.send_pyobj({"bucket_meta": bucket_meta, "is_last": False})
                     self.socket.recv()
                     bucket_meta = {}
                     offset = 0
+                    aligned_offset = 0
 
-                if offset + weight.nbytes > self.bucket_size:
+                if aligned_offset + weight_nbytes > self.bucket_size:
                     assert not self.use_shm, (
                         f"Weight {name}({weight.shape}, {weight.dtype}) is too large to fit in the bucket."
                         f"Please increase rollout.update_weights_bucket_megabytes({self.bucket_size_mb} MB)."
@@ -141,6 +151,7 @@ class BucketedWeightSender:
                     self._direct_send_large_weight(name, weight)
                     continue
 
+                offset = aligned_offset
                 bucket_meta[name] = {
                     "name": name,
                     "shape": weight.shape,
@@ -148,8 +159,8 @@ class BucketedWeightSender:
                     "offset": offset,
                     "handle": None,
                 }
-                self.buffer[offset : offset + weight.nbytes].copy_(weight.view(-1).view(torch.uint8), non_blocking=True)
-                offset += weight.nbytes
+                self.buffer[offset : offset + weight_nbytes].copy_(weight.view(-1).view(torch.uint8), non_blocking=True)
+                offset += weight_nbytes
 
             # send the last bucket
             get_torch_device().synchronize()
