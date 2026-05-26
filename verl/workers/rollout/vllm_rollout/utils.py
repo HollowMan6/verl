@@ -436,7 +436,6 @@ class vLLMColocateWorkerExtension:
                 for model in self._iter_all_models():
                     patch_vllm_moe_model_weight_loader(model)
 
-            assert self.device is not None
             receiver = BucketedWeightReceiver(
                 zmq_handle=self._get_zmq_handle(),
                 device=self.device,
