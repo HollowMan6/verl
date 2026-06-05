@@ -40,6 +40,7 @@ from verl.utils.device import get_resource_name, get_visible_devices_keyword, is
 from verl.utils.net_utils import get_free_port, is_valid_ipv6_address
 from verl.utils.profiler import DistProfiler, build_vllm_profiler_args
 from verl.utils.tokenizer import normalize_token_ids
+from verl.utils.vllm.routed_experts_compat import apply_vllm_routed_experts_buffer_patch
 from verl.utils.vllm.vllm_fp8_utils import apply_vllm_fp8_patches
 from verl.workers.config import HFModelConfig, RolloutConfig
 from verl.workers.rollout.replica import RolloutMode, RolloutReplica, TokenOutput
@@ -358,6 +359,8 @@ class vLLMHttpServer:
             args.update(lora_args)
 
         if self.config.enable_rollout_routing_replay:
+            os.environ["VERL_VLLM_ROUTED_EXPERTS_BUFFER_PATCH"] = "1"
+            apply_vllm_routed_experts_buffer_patch()
             args.update({"enable_return_routed_experts": True})
 
         server_args = ["serve", self.model_config.local_path] + build_cli_args_from_config(args)

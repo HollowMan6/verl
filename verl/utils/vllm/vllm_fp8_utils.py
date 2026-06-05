@@ -306,12 +306,27 @@ def _is_mxfp4_moe_module(module):
     ) in ("mxfp4", "gpt_oss_mxfp4")
 
 
+def _is_deepseek_v4_mega_moe_module(module):
+    return type(module).__name__ == "DeepseekV4MegaMoEExperts"
+
+
 def _mxfp4_moe_load_shape(module):
     quant_method = getattr(module, "quant_method", None)
     shape = (
         getattr(quant_method, "num_experts", getattr(module, "local_num_experts", None)),
         getattr(quant_method, "intermediate_size", getattr(module, "intermediate_size_per_partition", None)),
         getattr(quant_method, "hidden_size", getattr(module, "hidden_size", None)),
+    )
+    if any(value is None for value in shape):
+        return None
+    return tuple(int(value) for value in shape)
+
+
+def _deepseek_v4_mega_moe_load_shape(module):
+    shape = (
+        getattr(module, "num_local_experts", None),
+        getattr(module, "intermediate_size", None),
+        getattr(module, "hidden_size", None),
     )
     if any(value is None for value in shape):
         return None
@@ -331,42 +346,53 @@ def _make_mxfp4_moe_param(shape, device, weight_loader, quant_method=None):
     return _copy_weight_attrs(param, weight_loader=weight_loader, quant_method=quant_method)
 
 
+def _restore_mxfp4_moe_module_params(module, load_shape):
+    num_experts, intermediate_size, hidden_size = load_shape
+    device = _module_param_device(module)
+    weight_loader = getattr(module, "weight_loader", None)
+    module.w13_weight = _make_mxfp4_moe_param(
+        (num_experts, 2 * intermediate_size, hidden_size // 2),
+        device,
+        weight_loader,
+    )
+    module.w2_weight = _make_mxfp4_moe_param(
+        (num_experts, hidden_size, intermediate_size // 2),
+        device,
+        weight_loader,
+    )
+    module.w13_weight_scale = _make_mxfp4_moe_param(
+        (num_experts, 2 * intermediate_size, hidden_size // 32),
+        device,
+        weight_loader,
+        quant_method="block",
+    )
+    module.w2_weight_scale = _make_mxfp4_moe_param(
+        (num_experts, hidden_size, intermediate_size // 32),
+        device,
+        weight_loader,
+        quant_method="block",
+    )
+
+
 def _restore_mxfp4_moe_params_for_loading(model):
     restored = False
     for module in model.modules():
+        if _is_deepseek_v4_mega_moe_module(module):
+            load_shape = _deepseek_v4_mega_moe_load_shape(module)
+            if load_shape is None:
+                continue
+
+            _restore_mxfp4_moe_module_params(module, load_shape)
+            restored = True
+            continue
+
         if not _is_mxfp4_moe_module(module):
             continue
         load_shape = _mxfp4_moe_load_shape(module)
         if load_shape is None:
             continue
 
-        num_experts, intermediate_size, hidden_size = load_shape
-        device = _module_param_device(module)
-        weight_loader = getattr(module, "weight_loader", None)
-
-        module.w13_weight = _make_mxfp4_moe_param(
-            (num_experts, 2 * intermediate_size, hidden_size // 2),
-            device,
-            weight_loader,
-        )
-        module.w2_weight = _make_mxfp4_moe_param(
-            (num_experts, hidden_size, intermediate_size // 2),
-            device,
-            weight_loader,
-        )
-        module.w13_weight_scale = _make_mxfp4_moe_param(
-            (num_experts, 2 * intermediate_size, hidden_size // 32),
-            device,
-            weight_loader,
-            quant_method="block",
-        )
-        module.w2_weight_scale = _make_mxfp4_moe_param(
-            (num_experts, hidden_size, intermediate_size // 32),
-            device,
-            weight_loader,
-            quant_method="block",
-        )
-
+        _restore_mxfp4_moe_module_params(module, load_shape)
         quant_method = getattr(module, "quant_method", None)
         if quant_method is not None:
             for attr in ("moe_kernel", "moe_quant_config", "w13_precision_config", "w2_precision_config"):
@@ -493,9 +519,40 @@ def is_mxfp4_moe_weight(name, tensor, model):
     return _is_mxfp4_moe_module(module)
 
 
+def is_prequantized_mxfp4_moe_weight(name, tensor, model):
+    if not name.endswith(".weight") or ".experts." not in name:
+        return False
+    if not _is_prequantized_mxfp4_tensor(tensor):
+        return False
+    if _model_type(model) == "deepseek_v4":
+        return True
+    module = get_module_from_param_name(model, name)
+    return _is_mxfp4_moe_module(module)
+
+
+def is_prequantized_mxfp4_moe_scale(name, tensor, model):
+    if not name.endswith(".scale") or ".experts." not in name:
+        return False
+    if tensor.dtype != getattr(torch, "float8_e8m0fnu", None):
+        return False
+    if not any(f".w{i}.scale" in name for i in (1, 2, 3)):
+        return False
+    if _model_type(model) == "deepseek_v4":
+        return True
+    weight_name = name[: -len(".scale")] + ".weight"
+    module = get_module_from_param_name(model, weight_name)
+    return _is_mxfp4_moe_module(module)
+
+
 def _is_prequantized_mxfp4_tensor(tensor):
     float4_dtype = getattr(torch, "float4_e2m1fn_x2", None)
     return tensor.dtype in (torch.int8, torch.uint8, float4_dtype)
+
+
+def _as_mxfp4_storage_tensor(tensor):
+    if tensor.dtype in (torch.int8, getattr(torch, "float8_e8m0fnu", None)):
+        return tensor.view(torch.uint8)
+    return tensor
 
 
 def _is_prequantized_fp8_tensor(tensor):
@@ -527,6 +584,90 @@ def _model_type(model):
 
 def _uses_dot_scale_suffix(model):
     return _model_type(model) == "deepseek_v4"
+
+
+def _map_weight_name_for_vllm(model, name: str) -> str:
+    mapper = getattr(model, "hf_to_vllm_mapper", None)
+    map_name = getattr(mapper, "_map_name", None)
+    if callable(map_name):
+        mapped = map_name(name)
+        if mapped is not None:
+            return mapped
+
+    mapped = name
+    if ".shared_experts.w2" in mapped:
+        mapped = mapped.replace(".shared_experts.w2", ".shared_experts.down_proj", 1)
+    if mapped.endswith(".scale"):
+        mapped = mapped[: -len(".scale")] + ".weight_scale_inv"
+    if mapped.startswith("layers."):
+        mapped = "model." + mapped
+    elif mapped.startswith("embed."):
+        mapped = "model." + mapped
+    elif mapped == "head.weight":
+        mapped = "lm_head.weight"
+    return mapped
+
+
+def _cache_deepseek_v4_dense_fp8_scales(model, weights):
+    if _model_type(model) != "deepseek_v4":
+        return
+
+    scale_dtype = getattr(torch, "float8_e8m0fnu", None)
+    if scale_dtype is None:
+        return
+
+    cache = getattr(model, "_verl_dense_fp8_scale_cache", None)
+    if cache is None:
+        cache = {}
+        model._verl_dense_fp8_scale_cache = cache
+
+    for name, tensor in weights:
+        if not name.endswith(".scale") or ".experts." in name or tensor.dtype != scale_dtype:
+            continue
+        mapped_name = _map_weight_name_for_vllm(model, name)
+        cache[mapped_name] = tensor.detach().clone()
+
+
+def _copy_scale_shard(param: torch.nn.Parameter, loaded_scale: torch.Tensor) -> None:
+    target = param.data
+    loaded = loaded_scale.to(device=target.device, dtype=target.dtype)
+    if target.shape == loaded.shape:
+        target.copy_(loaded)
+        return
+
+    if target.ndim != loaded.ndim:
+        return
+
+    tp_rank = int(getattr(param, "tp_rank", 0))
+    tp_size = int(getattr(param, "tp_size", 1))
+    candidate_dims = []
+    for attr in ("input_dim", "_input_dim", "output_dim", "_output_dim"):
+        if hasattr(param, attr):
+            dim = _normalize_dim(int(getattr(param, attr)), target.ndim)
+            if dim not in candidate_dims:
+                candidate_dims.append(dim)
+
+    for dim in candidate_dims:
+        if loaded.shape[:dim] != target.shape[:dim] or loaded.shape[dim + 1 :] != target.shape[dim + 1 :]:
+            continue
+        if loaded.shape[dim] != target.shape[dim] * tp_size:
+            continue
+        start = tp_rank * target.shape[dim]
+        target.copy_(loaded.narrow(dim, start, target.shape[dim]))
+        return
+
+
+def _reload_cached_deepseek_v4_dense_fp8_scales(model):
+    cache = getattr(model, "_verl_dense_fp8_scale_cache", None)
+    if not cache:
+        return
+
+    params = dict(model.named_parameters())
+    for name, scale in cache.items():
+        param = params.get(name)
+        if param is None:
+            continue
+        _copy_scale_shard(param, scale)
 
 
 def _scale_name_for_weight(name, model, *, is_mxfp8_npu=False, use_scale_not_scale_inv=False, force_scale=False):
@@ -641,6 +782,14 @@ def quant_weights(weights, model, quant_config, dtype=torch.bfloat16):
     _use_scale_not_scale_inv = version.parse("0.11.0") <= version.parse(vllm.__version__) < version.parse("0.14.0")
 
     for k, v in weights:
+        if is_prequantized_mxfp4_moe_weight(k, v, model):
+            yield (k, _as_mxfp4_storage_tensor(v))
+            continue
+
+        if is_prequantized_mxfp4_moe_scale(k, v, model):
+            yield (k, _as_mxfp4_storage_tensor(v))
+            continue
+
         if is_mxfp4_moe_weight(k, v, model):
             if _is_rank_zero():
                 logger.debug(f"Quantizing to MXFP4 blockwise: {k}")
@@ -737,6 +886,7 @@ def process_quanted_weights_after_loading(model_runner, reload_state=None, is_dr
         apply_mxfp8_transformation_after_loading(model)
     if reload_state.get("is_mxfp4_moe"):
         _process_mxfp4_moe_weights_after_loading(model)
+    _reload_cached_deepseek_v4_dense_fp8_scales(model)
 
 
 def load_quanted_weights(weights, model_runner, is_drafter=False, prepare_model=True, process_model=True):
@@ -748,7 +898,13 @@ def load_quanted_weights(weights, model_runner, is_drafter=False, prepare_model=
     if prepare_model:
         reload_state = prepare_quanted_weights_for_loading(model_runner, is_drafter=is_drafter)
 
-    weights_quantized = quant_weights(weights, model, quant_config, dtype=vllm_dtype)
+    if isinstance(weights, list):
+        weights_for_load = weights
+    else:
+        weights_for_load = list(weights)
+    _cache_deepseek_v4_dense_fp8_scales(model, weights_for_load)
+
+    weights_quantized = quant_weights(weights_for_load, model, quant_config, dtype=vllm_dtype)
 
     # Monkey patch the param class to their subclass, as certain models
     # will check the param type to call the proper weightloader
@@ -759,6 +915,7 @@ def load_quanted_weights(weights, model_runner, is_drafter=False, prepare_model=
     # Finally load the weights into vllm
     try:
         loaded_params = model.load_weights(weights_quantized)
+        _reload_cached_deepseek_v4_dense_fp8_scales(model)
     finally:
         # Undo the type change above to the original type
         for _, param in model.named_parameters():

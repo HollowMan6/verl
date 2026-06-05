@@ -29,6 +29,7 @@ from verl.plugin.platform import get_platform
 from verl.utils.device import is_npu_available
 from verl.utils.vllm import TensorLoRARequest, VLLMHijack
 from verl.utils.vllm.patch import patch_vllm_moe_model_weight_loader
+from verl.utils.vllm.routed_experts_compat import apply_vllm_routed_experts_buffer_patch
 from verl.utils.vllm.vllm_fp8_utils import apply_vllm_fp8_patches, is_fp8_model, load_quanted_weights
 from verl.workers.rollout.vllm_rollout.weight_update_utils import apply_buffer_updates, split_buffer_updates
 
@@ -155,6 +156,8 @@ class vLLMColocateWorkerExtension:
         # 1. patch for Lora
         VLLMHijack.hijack()
         vllm_config = kwargs.get("vllm_config")
+        if os.environ.get("VERL_VLLM_ROUTED_EXPERTS_BUFFER_PATCH", "0") == "1":
+            apply_vllm_routed_experts_buffer_patch()
         # 2. patch online fp8 quant. Some models, including DeepSeek-V4, get
         # fp8 from the HF config rather than an explicit rollout quantization arg.
         if os.environ.get("VERL_VLLM_FP8_QUANT_ENABLED", "0") == "1" or is_fp8_model(vllm_config):
